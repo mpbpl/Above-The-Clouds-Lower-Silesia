@@ -69,6 +69,13 @@
   #helpbtn:hover { border-color:#8fd0ff; color:#8fd0ff; }
   footer { padding:4px 12px; font-size:12px; color:var(--dim); background:var(--panel); border-top:1px solid var(--line); }
   footer a { color:var(--dim); }
+  .legend .lf { cursor:pointer; user-select:none; border-radius:3px; }
+  .legend .lf:hover { background:#ffffff14; }
+  .legend .lf.off { opacity:.35; text-decoration:line-through; }
+  .legend .lreset { cursor:pointer; color:#8fd0ff; margin-top:4px; font-size:12px; user-select:none; }
+  .wt td.n { cursor:pointer; }
+  .wt tr.hl td.n, .wt tr.hl td.e { background:#2f4a66; color:#fff; font-weight:600; }
+  .pk.sel { filter:drop-shadow(0 0 7px #fff) drop-shadow(0 0 4px rgba(255,35,70,.95)); }
 </style>
 </head>
 <body>
@@ -106,6 +113,7 @@
           <li><b>Top-left list:</b> peaks above the clouds now. <b>Bottom-left table:</b> the next 48 h for the highest and favourite peaks – click a cell to jump to that hour.</li>
           <li><b>Colours:</b> <span class="sw" style="background:#7d8087"></span>in cloud · <span class="sw" style="background:#96c8f0"></span><span class="sw" style="background:#46a55a"></span><span class="sw" style="background:#ebc332"></span><span class="sw" style="background:#cd463c"></span><span class="sw" style="background:#0a0a0a"></span>above clouds with cloud cover 6–8 / 4–6 / 2–4 / 1–2 / 0 oktas · <span class="sw" style="background:#b078dc"></span>fog (estimated) · no colour = below cloud base or no clouds.</li>
           <li><b>Peaks ▲:</b> <span class="sw" style="background:#3fb950"></span>above clouds · <span class="sw" style="background:#9aa4ae"></span>in cloud · <span class="sw" style="background:#58a6ff"></span>below clouds · <span class="sw" style="background:#e3b341"></span>no clouds. Dashed outline = uncertain (small margin).</li>
+          <li><b>Click a ▲</b> to pin its info (it stays open and the peak's row in the table is highlighted); click a name in the table to find it on the map. <b>Click a legend item</b> to hide/show that class of terrain or peaks; ↺ restores all.</li>
           <li>The first load can take a couple of minutes (LOADING banner); data is then cached for 3 hours.</li>
         </ul>
       </div>
@@ -118,6 +126,7 @@
           <li><b>Lista w lewym górnym rogu:</b> szczyty ponad chmurami teraz. <b>Tabela w lewym dolnym rogu:</b> najbliższe 48 h dla najwyższych i wybranych szczytów – kliknij komórkę, aby przejść do tej godziny.</li>
           <li><b>Kolory:</b> <span class="sw" style="background:#7d8087"></span>w chmurze · <span class="sw" style="background:#96c8f0"></span><span class="sw" style="background:#46a55a"></span><span class="sw" style="background:#ebc332"></span><span class="sw" style="background:#cd463c"></span><span class="sw" style="background:#0a0a0a"></span>ponad chmurami przy zachmurzeniu 6–8 / 4–6 / 2–4 / 1–2 / 0 okt. · <span class="sw" style="background:#b078dc"></span>mgła (szacunek) · brak koloru = pod podstawą chmur lub bez chmur.</li>
           <li><b>Szczyty ▲:</b> <span class="sw" style="background:#3fb950"></span>ponad chmurami · <span class="sw" style="background:#9aa4ae"></span>w chmurze · <span class="sw" style="background:#58a6ff"></span>pod chmurami · <span class="sw" style="background:#e3b341"></span>bez chmur. Przerywany kontur = niepewne (mały zapas).</li>
+          <li><b>Kliknij ▲</b>, aby przypiąć info o szczycie (zostaje otwarte, a jego wiersz w tabeli jest podświetlony); kliknij nazwę w tabeli, aby znaleźć szczyt na mapie. <b>Kliknij pozycję legendy</b>, aby ukryć/pokazać daną klasę terenu lub szczytów; ↺ przywraca wszystko.</li>
           <li>Pierwsze ładowanie może potrwać kilka minut (napis LOADING); potem dane są pamiętane przez 3 godziny.</li>
         </ul>
       </div>
@@ -141,7 +150,7 @@ const CFG = {
   dLat: 0.0065, dLon: 0.0105,        // komórka terenu ~720 m
   wLat: 0.063, wLon: 0.1,             // siatka pogodowa ~7 km (zagęszczana 2×2 powyżej denseAbove)
   hLat: 0.135, hLon: 0.2145,         // rzadka siatka (~15 km) tylko dla wysokości poziomów ciśnienia
-  px: 3, TZ: 10, batch: 20, msPerLoc: 150, denseAbove: 700, cacheMs: 3 * 3600e3,   // msPerLoc: min. odstęp między startami zapytań na każdy punkt w paczce (150 ms ≈ 400 punktów/min przy limicie 600) fogDepth: 150, peakUnc: 300, tableN: 10,
+  px: 3, TZ: 10, batch: 20, msPerLoc: 150, denseAbove: 700, cacheMs: 3 * 3600e3, fogDepth: 150, peakUnc: 300, tableN: 10,   // msPerLoc: min. odstęp między startami zapytań na każdy punkt w paczce (150 ms ≈ 400 punktów/min przy limicie 600)
   levels: [975, 950, 925, 900, 850, 800, 700]
 };
 const KX = Math.cos(50.5 * Math.PI / 180);
@@ -472,25 +481,43 @@ winCtl.onAdd = () => {
     winOpen = !winOpen; $('wintable').style.display = winOpen ? '' : 'none'; winHead();
   });
   d.addEventListener('click', e => { const td = e.target.closest('td[data-t]'); if (td) { $('hour').value = td.dataset.t; render(); } });
+  d.addEventListener('click', e => {   // klik w nazwę/wysokość: znajdź szczyt na mapie i przypnij jego info
+    const tn = e.target.closest('td.n, td.e'); if (!tn) return;
+    const mk = peakMarkers[+tn.parentNode.dataset.p];
+    if (mk && map.hasLayer(mk)) { map.panTo(mk.getLatLng()); mk.openPopup(); }
+  });
   d.addEventListener('mouseover', e => { const td = e.target.closest('td.c'); if (td && !td.title) td.title = cellTitle(+td.dataset.r, +td.dataset.t); });
   return d;
 };
 winCtl.addTo(map);
 
+const HID = { t: new Set(), p: new Set() };   // ukryte klasy: t = teren, p = szczyty (filtr z legendy)
+const A_GRP = ['a0', 'a12', 'a12', 'a34', 'a34', 'a56', 'a56', 'a78', 'a78'];   // okty -> grupa koloru
 function legendHTML() {
-  const row = (c, t) => `<div><i style="background:${c}"></i>${t}</div>`;
+  const row = (c, t, g, k) => `<div class="lf${HID[g].has(k) ? ' off' : ''}" data-g="${g}" data-k="${k}"><i style="background:${c}"></i>${t}</div>`;
   const ab = r => T2(`nad chmurami, ${r} okt.`, `above clouds, ${r} oktas`);
-  return `<b>${T2('Teren względem chmur', 'Terrain vs. clouds')}</b>` + row(C_IN, T2('w chmurze', 'in cloud')) +
-    row(C_FOG, T2('mgła (szacunek z wilgotności)', 'fog (estimated from humidity)')) +
-    row(C_ABOVE[8], ab('6–8')) + row(C_ABOVE[6], ab('4–6')) + row(C_ABOVE[4], ab('2–4')) + row(C_ABOVE[2], ab('1–2')) + row(C_ABOVE[0], ab('0')) +
+  return `<b>${T2('Teren względem chmur', 'Terrain vs. clouds')}</b>` + row(C_IN, T2('w chmurze', 'in cloud'), 't', 'c') +
+    row(C_FOG, T2('mgła (szacunek z wilgotności)', 'fog (estimated from humidity)'), 't', 'f') +
+    row(C_ABOVE[8], ab('6–8'), 't', 'a78') + row(C_ABOVE[6], ab('4–6'), 't', 'a56') + row(C_ABOVE[4], ab('2–4'), 't', 'a34') + row(C_ABOVE[2], ab('1–2'), 't', 'a12') + row(C_ABOVE[0], ab('0'), 't', 'a0') +
     `<div style="color:#8b99a6">${T2('brak koloru: pod podstawą chmur lub bez chmur', 'no colour: below cloud base or no clouds')}</div>` +
     `<div style="margin-top:4px"><b>${T2('Szczyty', 'Peaks')}</b></div>` +
-    row(PCOL.above, T2('ponad chmurami', 'above clouds')) + row(PCOL.in, T2('w chmurze', 'in cloud')) + row(PCOL.under, T2('pod chmurami', 'below clouds')) + row(PCOL.clear, T2('bez chmur', 'no clouds')) +
-    `<div style="color:#8b99a6">${T2('▲ pulsujący trójkąt; przerywany kontur = niepewne', '▲ pulsing triangle; dashed outline = uncertain')}</div>`;
+    row(PCOL.above, T2('ponad chmurami', 'above clouds'), 'p', 'above') + row(PCOL.in, T2('w chmurze', 'in cloud'), 'p', 'in') + row(PCOL.under, T2('pod chmurami', 'below clouds'), 'p', 'under') + row(PCOL.clear, T2('bez chmur', 'no clouds'), 'p', 'clear') +
+    `<div style="color:#8b99a6">${T2('▲ pulsujący trójkąt; przerywany kontur = niepewne', '▲ pulsing triangle; dashed outline = uncertain')}</div>` +
+    `<div class="lreset">${T2('↺ pokaż wszystko (klik w pozycję = ukryj/pokaż)', '↺ show all (click an item = hide/show)')}</div>`;
 }
 const legend = L.control({ position: 'bottomright' });
 legend.onAdd = () => { const d = L.DomUtil.create('div', 'legend'); d.innerHTML = legendHTML(); return d; };
 legend.addTo(map);
+L.DomEvent.disableClickPropagation(legend.getContainer());
+legend.getContainer().addEventListener('click', e => {
+  if (e.target.closest('.lreset')) { HID.t.clear(); HID.p.clear(); }
+  else {
+    const d = e.target.closest('.lf'); if (!d) return;
+    const s = HID[d.dataset.g]; s.has(d.dataset.k) ? s.delete(d.dataset.k) : s.add(d.dataset.k);
+  }
+  legend.getContainer().innerHTML = legendHTML();
+  render();   // przerysowuje teren i (przez updatePeaks) znaczniki szczytów
+});
 // przełącznik języka nad legendą (kontrolka dodana później leży wyżej w tym samym rogu)
 const langCtl = L.control({ position: 'bottomright' });
 langCtl.onAdd = () => {
@@ -504,7 +531,7 @@ langCtl.addTo(map);
 
 // ---------- dane ----------
 let inside, wPts = [], wCoords = [], hCoords = [], elev = null, nb = null, overlay = null, lastLayers = [];
-let peaks = [], peakMarkers = [], fogRH = null, nowIdx = 0, peakNote = { pl: '', en: '' };
+let selPeak = null, peaks = [], peakMarkers = [], fogRH = null, nowIdx = 0, peakNote = { pl: '', en: '' };
 
 async function getJSON(url, lb) {   // lb = [etykieta PL, etykieta EN]
   let n429 = 0, nErr = 0;
@@ -623,6 +650,7 @@ function render() {
       if (ok && rh >= fthr && h <= ew + CFG.fogDepth) cls = 'f';
     }
     if (cls === 'n') continue;
+    if (HID.t.has(cls[0] === 'a' ? A_GRP[+cls.slice(1)] : cls)) continue;
     ctx.fillStyle = cls === 'c' ? C_IN : cls === 'f' ? C_FOG : C_ABOVE[+cls.slice(1)];
     ctx.fillRect((k % COLS) * CFG.px, ((k / COLS) | 0) * CFG.px, CFG.px, CFG.px);
   }
@@ -655,7 +683,7 @@ const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 // ---------- szczyty ----------
 function peakIcon(col, unc) {
   const svg = `<svg width="22" height="21" viewBox="0 0 28 26"><polygon points="14,2 26,23 2,23" fill="${col}" fill-opacity="${unc ? 0.3 : 1}" stroke="#ff2a4d" stroke-width="2" stroke-linejoin="round"${unc ? ' stroke-dasharray="5 3"' : ''}/></svg>`;
-  return L.divIcon({ html: `<div class="pk${unc ? ' u' : ''}">${svg}</div>`, className: '', iconSize: [22, 21], iconAnchor: [11, 12] });
+  return L.divIcon({ html: `<div class="pk${unc ? ' u' : ''}">${svg}</div>`, className: '', iconSize: [22, 21], iconAnchor: [11, 12], popupAnchor: [0, -12] });
 }
 // Szczyty ze stałej listy; leżące poza obszarem są pomijane (brak punktów pogodowych) i wymienione w komunikacie
 function buildPeaks() {
@@ -672,12 +700,20 @@ function initPeaks() {
   const kept = [];
   for (const p of peaks) if (p.watch || !kept.some(q => Math.hypot((q.lon - p.lon) * KX, q.lat - p.lat) * 111 < 2)) kept.push(p);
   peaks = kept.sort((a, b) => b.ele - a.ele);
+  peaks.forEach((p, i) => { p.idx = i; });
   for (const p of peaks) {
     const best = wCoords.map((c, i) => [((c[1] - p.lon) * KX) ** 2 + (c[0] - p.lat) ** 2, i]).sort((a, b) => a[0] - b[0]).slice(0, 4);
     const ws = best.map(b => 1 / (b[0] + 1e-8)), sum = ws.reduce((a, b) => a + b, 0);
     p.nb = best.map(b => b[1]); p.w = ws.map(v => v / sum);
   }
-  peakMarkers = peaks.map(p => L.marker([p.lat, p.lon], { pane: 'peaks', icon: peakIcon('#888', false) }).bindTooltip('x', { direction: 'top', offset: [0, -12] }));
+  peakMarkers = peaks.map((p, i) => {
+    const mk = L.marker([p.lat, p.lon], { pane: 'peaks', icon: peakIcon('#888', false) }).bindTooltip('x', { direction: 'top', offset: [0, -12] }).bindPopup('x', { autoPan: false });
+    const pk = () => mk.getElement()?.querySelector('.pk');
+    mk.on('popupopen', () => { selPeak = i; hlRow(i); pk()?.classList.add('sel'); mk.closeTooltip(); });
+    mk.on('popupclose', () => { if (selPeak === i) { selPeak = null; hlRow(null); } pk()?.classList.remove('sel'); });
+    mk.on('tooltipopen', () => { if (mk.isPopupOpen()) mk.closeTooltip(); });
+    return mk;
+  });
 }
 function peakInfo(p, t) {   // t == null: bieżąca godzina z suwaka
   const thr = +$('thr').value;
@@ -687,6 +723,11 @@ function peakInfo(p, t) {   // t == null: bieżąca godzina z suwaka
   const rep = st.find(s => s.st === win);
   const why = votes[win] < 0.75 ? T2('punkty pogodowe się różnią', 'neighbouring weather points disagree') : rep.margin < CFG.peakUnc ? T2(`zapas poniżej ${CFG.peakUnc} m`, `margin below ${CFG.peakUnc} m`) : '';
   return { st: win, rep, why };
+}
+function hlRow(i) {   // podświetla wiersz wybranego szczytu w tabeli okien
+  document.querySelectorAll('.wt tr.hl').forEach(e => e.classList.remove('hl'));
+  const tr = i == null ? null : document.querySelector(`.wt tr[data-p="${i}"]`);
+  if (tr) { tr.classList.add('hl'); tr.scrollIntoView({ block: 'nearest' }); }
 }
 function peakText(p, inf) {
   const s = inf.rep, lab = stLab()[inf.st];
@@ -706,7 +747,12 @@ function updatePeaks() {
     const ik = inf.st + (inf.why ? 'u' : '');   // ikonę wymieniamy tylko przy zmianie stanu (inaczej pulsowanie by się resetowało)
     if (mk._ik !== ik) { mk.setIcon(peakIcon(PCOL[inf.st], !!inf.why)); mk._ik = ik; }
     mk.setTooltipContent(peakText(p, inf));
-    if (!map.hasLayer(mk)) mk.addTo(map);
+    mk.setPopupContent(peakText(p, inf));
+    if (HID.p.has(inf.st)) { if (map.hasLayer(mk)) map.removeLayer(mk); }   // filtr z legendy
+    else {
+      if (!map.hasLayer(mk)) mk.addTo(map);
+      if (selPeak === i) mk.getElement()?.querySelector('.pk')?.classList.add('sel');
+    }
     if (inf.st === 'above') rows.push(`<div>▲ <b>${esc(p.name)}</b> ${p.ele} m, ${T2('chmury do', 'clouds up to')} ${Math.round(inf.rep.top)} m${inf.why ? ` <span class="u">(${T2('niepewne', 'uncertain')})</span>` : ''}</div>`);
   });
   $('peaklist').innerHTML = `<b>${T2('Szczyty ponad chmurami', 'Peaks above the clouds')}: ${rows.length}</b>` + rows.join('');
@@ -742,7 +788,7 @@ function buildTable() {
   peaks.filter(p => p.ele >= +$('pmin').value).forEach((p, ri) => {
     const inf = T.map((_, t) => peakInfo(p, t)), nm = esc(p.name);
     tblRows.push({ name: p.name, inf, T });
-    body += `<tr><td class="n">${nm}</td><td class="e">${p.ele} m</td>`;
+    body += `<tr data-p="${p.idx}"${p.idx === selPeak ? ' class="hl"' : ''}><td class="n">${nm}</td><td class="e">${p.ele} m</td>`;
     inf.forEach((x, t) => { body += `<td class="c s${x.st[0]}${x.why ? ' q' : ''}${t < nowIdx ? ' past' : ''}${t === cur ? ' sel' : ''}" data-r="${ri}" data-t="${t}"></td>`; });
     body += '</tr>';
     const wins = []; let s0 = -1;
@@ -760,6 +806,7 @@ function buildTable() {
   });
   if (noWin) lines += `<div style="color:#8b99a6">${T2(`Szczyty bez okien w prognozie: ${noWin}.`, `Peaks with no windows in the forecast: ${noWin}.`)}</div>`;
   box.innerHTML = `<div style="overflow-x:auto"><table class="wt">${head}</tr>${body}</table></div><div class="ws">${lines}<div style="color:#8b99a6">${T2('Biała ramka = wybrana godzina; kreskowane = niepewne; przyciemnione = godziny już minione.', 'White frame = selected hour; hatched = uncertain; dimmed = hours already past.')}</div></div>`;
+  hlRow(selPeak);
 }
 
 // ---------- start ----------
