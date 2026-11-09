@@ -35,38 +35,6 @@ An interactive, single-file web map that shows **where the terrain rises above t
 | Base map | [OpenTopoMap](https://opentopomap.org) | CC-BY-SA |
 | Map library | [Leaflet](https://leafletjs.com) 1.9.4 | BSD-2-Clause |
 
-The free Open-Meteo API is for **non-commercial** use and has rate limits per IP address. OpenTopoMap and Overpass are public servers with fair-use policies – check them before sharing the page widely.
-
-## Limitations
-
-- Results are **model-based estimates** for orientation only – **not a substitute for official mountain forecasts** or safety decisions.
-- The fog estimate (humidity threshold) and the cloud threshold have **not been validated** against observations; tune them against webcams or meteograms.
-- Open-Meteo has announced that the DWD ICON models move to native grids on 30 November 2026. The behaviour of the variables used here after that date has **not been verified**.
-
-## Run locally
-
-Open `index.html` in a modern browser (internet connection required). The first load downloads data and may take a couple of minutes; later loads use the cache.
-
-## Configuration
-
-Constants at the top of the script in `index.html`:
-
-- `POLY_N`, `POLY_S` – boundary of the study area; `BBOX` – bounding box
-- `CFG` – grid steps, densification height (`denseAbove`), pacing, cache lifetime
-- `MANUAL_PEAKS` – list of peaks (name, height, optionally lat/lon)
-
-## Deploy on GitHub Pages
-
-1. Create a **public** repository and add `index.html` and this `README.md`.
-2. *Settings → Pages → Build and deployment → Deploy from a branch → `main` / `(root)` → Save.*
-3. After a minute or two the site is available at `https://<your-username>.github.io/<repository>/`.
-
-## License
-
-Add a licence of your choice (e.g. MIT) as `LICENSE`. Note that the data sources above have their own terms.
-
----
-
 ## 🇵🇱 Po polsku
 
 Interaktywna mapa w jednym pliku HTML, która pokazuje, **gdzie teren wznosi się ponad wierzchołek warstwy chmur** („morze chmur") w południowej części Dolnego Śląska i w sąsiednich czeskich Sudetach – a także **mgłę** i **szczyty** – na najbliższe **48 godzin**.
@@ -90,16 +58,7 @@ Interaktywna mapa w jednym pliku HTML, która pokazuje, **gdzie teren wznosi si�
 4. **Szczyty** są dopasowywane do warstw w swoim położeniu i na swojej wysokości.
 5. **Pamięć podręczna i limity:** prognozy 3 h, lista szczytów 30 dni (IndexedDB w przeglądarce). Zapytania są rozłożone w czasie i automatycznie ponawiane po HTTP 429.
 
-### Źródła danych
 
-Tabela źródeł i licencji – patrz wersja angielska powyżej. Darmowe API Open-Meteo jest do użytku **niekomercyjnego** i ma limity na adres IP.
 
-### Ograniczenia
 
-- Wyniki to **szacunki z modelu**, tylko orientacyjne – **nie zastępują oficjalnych prognoz górskich** ani decyzji dotyczących bezpieczeństwa.
-- Szacunek mgły i próg chmury **nie zostały zwalidowane** z obserwacjami – dostrajaj je na podstawie kamerek lub meteogramów.
-- Open-Meteo zapowiedziało przejście modeli DWD ICON na siatki natywne od 30 listopada 2026. Działanie użytych tu zmiennych po tej dacie **nie zostało sprawdzone**.
 
-### Uruchomienie i wdrożenie
-
-Otwórz `index.html` w nowoczesnej przeglądarce (wymagany internet). Wdrożenie: repozytorium **publiczne** → *Settings → Pages → Deploy from a branch → `main` / `(root)`*.
