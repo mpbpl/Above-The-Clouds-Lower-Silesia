@@ -6,6 +6,8 @@ An interactive, single-file web map that shows **where the terrain rises above t
 
 https://mpbpl.github.io/Above-The-Clouds-Lower-Silesia/
 
+<img width="1250" height="635" alt="Above the clouds – Lower Silesia" src="https://github.com/user-attachments/assets/a5ea0b39-df36-4351-bcbb-6efa70b07637" />
+
 ## Features
 
 - **Terrain vs. clouds.** Grey = terrain inside a cloud layer. For terrain *above* the cloud top the colour shows the cloud cover in oktas: pale blue 6–8, green 4–6, yellow 2–4, red 1–2, black 0. No colour = below the cloud base or no clouds.
