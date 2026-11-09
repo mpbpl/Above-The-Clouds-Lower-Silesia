@@ -4,9 +4,7 @@
 
 An interactive, single-file web map that shows **where the terrain rises above the top of the cloud layer** (the "sea of clouds" view) in the southern part of Lower Silesia and the neighbouring Czech Sudetes – plus **fog** and **mountain peaks** – for the next **48 hours**.
 
-> **Live demo:** `(https://mpbpl.github.io/Above-The-Clouds-Lower-Silesia/)`
->
-> ![Screenshot](docs/screenshot.png) *(add a screenshot to `docs/screenshot.png`)*
+https://mpbpl.github.io/Above-The-Clouds-Lower-Silesia/
 
 ## Features
 
@@ -39,7 +37,7 @@ An interactive, single-file web map that shows **where the terrain rises above t
 
 Interaktywna mapa w jednym pliku HTML, która pokazuje, **gdzie teren wznosi się ponad wierzchołek warstwy chmur** („morze chmur") w południowej części Dolnego Śląska i w sąsiednich czeskich Sudetach – a także **mgłę** i **szczyty** – na najbliższe **48 godzin**.
 
-> **Demo:** `(https://mpbpl.github.io/Above-The-Clouds-Lower-Silesia/)`
+https://mpbpl.github.io/Above-The-Clouds-Lower-Silesia/
 
 ### Funkcje
 
