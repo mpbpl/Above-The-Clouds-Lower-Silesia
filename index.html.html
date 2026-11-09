@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Above the clouds – Lower Silesia (south)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root { --bg:#14191f; --panel:#1c232b; --line:#2c3640; --txt:#dfe6ec; --dim:#8b99a6; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { display:flex; flex-direction:column; background:var(--bg); color:var(--txt);
+         font:14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:8px 12px;
+           background:var(--panel); border-bottom:1px solid var(--line); }
+  header label { display:flex; align-items:center; gap:6px; color:var(--dim); }
+  header input[type=range] { width:180px; }
+  header select { background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:4px; padding:3px 6px; font:inherit; }
+  #when { min-width:9em; color:var(--txt); font-variant-numeric:tabular-nums; }
+  #status { color:var(--dim); margin-left:auto; max-width:46ch; }
+  #status.err { color:#f09a8a; }
+  #mapwrap { flex:1; display:flex; position:relative; min-height:300px; }
+  #map { flex:1; background:#222; }
+  #loading { position:absolute; top:6px; right:10px; z-index:1200; pointer-events:none; display:flex; align-items:flex-start; gap:2px;
+             opacity:0; visibility:hidden; transition:opacity .4s; filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+  #loading.on { opacity:1; visibility:visible; }
+  #loading .arrow { margin-top:-4px; animation:arrowbob 1.1s ease-in-out infinite; }
+  @keyframes arrowbob { 0%,100% { transform:translate(0,0); } 50% { transform:translate(0,-6px); } }
+  .lang { background:rgba(20,25,31,.92); color:var(--dim); padding:3px 9px; border-radius:6px; font-size:13px; user-select:none; }
+  .lang .lg { cursor:pointer; padding:0 4px; }
+  .lang .lg.act { color:#fff; font-weight:700; text-decoration:underline; }
+  .cloudimg { image-rendering:pixelated; }
+  .legend { background:rgba(20,25,31,.92); color:var(--txt); padding:8px 10px; border-radius:6px; line-height:1.7; }
+  .legend i { display:inline-block; width:14px; height:14px; margin-right:7px; vertical-align:-2px; border:1px solid #0006; }
+  .peaks { background:rgba(20,25,31,.92); color:var(--txt); padding:8px 10px; border-radius:6px; max-height:45vh; overflow:auto; font-size:13px; line-height:1.5; max-width:300px; }
+  .peaks b { color:#fff; } .u { color:#e3b341; }
+  .win { background:rgba(20,25,31,.94); color:var(--txt); border-radius:6px; padding:6px 8px; font-size:12px; max-width:min(900px,94vw); }
+  .win .wh { cursor:pointer; font-weight:600; }
+  .win .wb { margin-top:6px; max-height:42vh; overflow:auto; }
+  .wt { border-collapse:collapse; }
+  .wt th { font-weight:400; color:var(--dim); font-size:11px; text-align:left; padding:0 0 2px; white-space:nowrap; }
+  .wt td.n { padding-right:8px; white-space:nowrap; }
+  .wt td.e { padding-right:10px; white-space:nowrap; text-align:right; color:var(--dim); font-variant-numeric:tabular-nums; }
+  .wt td.c { width:11px; min-width:11px; height:15px; cursor:pointer; border-right:1px solid #1c232b; }
+  .wt td.c { background:var(--c, #888); }
+  .wt td.c.sa { --c:#3fb950; } .wt td.c.si { --c:#9aa4ae; } .wt td.c.su { --c:#58a6ff; } .wt td.c.sc { --c:#e3b341; }
+  .wt td.c.q { background:repeating-linear-gradient(45deg, var(--c) 0 3px, #1c232b 3px 6px); }
+  .wt td.c.past { opacity:.4; }
+  .wt td.c.sel { box-shadow:inset 0 0 0 2px #fff; }
+  .ws { margin-top:6px; line-height:1.5; }
+  .pk { filter:drop-shadow(0 0 4px rgba(255,35,70,.95)); animation:pkpulse 1.3s ease-in-out infinite; transform-origin:50% 60%; }
+  .pk.u { animation-duration:2.2s; }
+  @keyframes pkpulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.3); } }
+  #help { position:fixed; inset:0; z-index:3000; display:none; align-items:center; justify-content:center; background:rgba(8,12,16,.62); padding:12px; }
+  #help.on { display:flex; }
+  #help .box { position:relative; background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:10px; width:min(880px,96vw); max-height:88vh; overflow:auto; padding:18px 24px 14px; box-shadow:0 12px 40px rgba(0,0,0,.6); }
+  #help .x { position:absolute; top:10px; right:12px; width:38px; height:38px; border-radius:50%; border:2px solid #ff4d6a; background:#2a1d22; color:#ff6b84; font:700 22px/1 system-ui, sans-serif; cursor:pointer; padding:0; }
+  #help .x:hover { background:#ff4d6a; color:#fff; }
+  #help h2 { margin:0 50px 10px 0; font-size:19px; }
+  #help h3 { margin:0 0 6px; font-size:15px; color:#8fd0ff; }
+  #help .cols { display:grid; grid-template-columns:1fr 1fr; gap:6px 28px; }
+  @media (max-width:720px) { #help .cols { grid-template-columns:1fr; } }
+  #help ul { margin:0 0 8px; padding-left:18px; }
+  #help li { margin:4px 0; }
+  #help .sw { display:inline-block; width:11px; height:11px; border-radius:2px; vertical-align:-1px; margin-right:3px; border:1px solid #0006; }
+  #help .note { color:var(--dim); font-size:12.5px; margin-top:8px; border-top:1px solid var(--line); padding-top:8px; }
+  #helpbtn { background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:50%; width:26px; height:26px; cursor:pointer; font-weight:700; padding:0; }
+  #helpbtn:hover { border-color:#8fd0ff; color:#8fd0ff; }
+  footer { padding:4px 12px; font-size:12px; color:var(--dim); background:var(--panel); border-top:1px solid var(--line); }
+  footer a { color:var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <label><span data-pl="Godzina" data-en="Hour"></span> <input id="hour" type="range" min="0" max="47" value="0"><span id="when">–</span></label>
+  <label><span data-pl="Próg chmury" data-en="Cloud threshold"></span> <input id="thr" type="range" min="20" max="95" step="5" value="50"><span id="thrv">50%</span></label>
+  <label>Model <select id="model">
+    <option value="icon_d2">ICON-D2 (2 km)</option>
+    <option value="icon_eu">ICON-EU (7 km)</option>
+  </select></label>
+  <label><span data-pl="Próg mgły (RH)" data-en="Fog threshold (RH)"></span> <input id="fog" type="range" min="90" max="100" step="1" value="97"><span id="fogv">97%</span></label>
+  <label><span data-pl="Szczyty ≥" data-en="Peaks ≥"></span> <select id="pmin"><option value="0" selected data-pl="wszystkie" data-en="all">all</option><option value="800">800 m</option><option value="1000">1000 m</option><option value="1200">1200 m</option></select></label>
+  <label><span data-pl="Krycie" data-en="Opacity"></span> <input id="opa" type="range" min="20" max="100" step="5" value="100"></label>
+  <button id="helpbtn" title="Help / Pomoc" aria-label="Help / Pomoc">?</button>
+  <span id="status">Start…</span>
+</header>
+<div id="mapwrap"><div id="map"></div>
+  <div id="loading"><div id="loadart"></div>
+    <svg class="arrow" width="40" height="52" viewBox="0 0 40 52" fill="none" stroke="#5db0ff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 48 C 8 36, 32 24, 20 8"/><path d="M9 18 L20 5 L31 18"/></svg>
+  </div></div>
+<footer id="foot" data-pl='Dane pogodowe: <a href="https://open-meteo.com">Open-Meteo.com</a> (DWD ICON), CC BY 4.0 · wysokości terenu: AWS Terrain Tiles (Terrarium: SRTM i inne) · mapa: OpenTopoMap/OSM. Granice to łamane między wskazanymi miejscowościami. Wierzchołek chmur jest szacowany z wilgotności na poziomach ciśnienia.' data-en='Weather data: <a href="https://open-meteo.com">Open-Meteo.com</a> (DWD ICON), CC BY 4.0 · terrain heights: AWS Terrain Tiles (Terrarium: SRTM and others) · map: OpenTopoMap/OSM. The area boundary is a polyline between the listed towns. Cloud tops are estimated from humidity on pressure levels.'></footer>
+
+
+<div id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle">
+  <div class="box">
+    <button class="x" id="helpx" aria-label="Close / Zamknij" title="Close / Zamknij">✕</button>
+    <h2 id="helptitle">How to use · Jak używać</h2>
+    <div class="cols">
+      <div lang="en">
+        <h3>English</h3>
+        <ul>
+          <li><b>What it shows:</b> where the terrain rises <i>above the top of the cloud layer</i> (a "sea of clouds" view), plus fog and mountain peaks, for the next 48 hours.</li>
+          <li><b>Hour</b> – pick the forecast hour. <b>Cloud threshold</b> – cloud amount (%) that counts as a layer. <b>Fog threshold</b> – humidity (RH) treated as fog. <b>Peaks ≥</b> – minimum height of shown peaks. <b>Opacity</b> – overlay strength. <b>EN | PL</b> – map language.</li>
+          <li><b>Click the map</b> for terrain height and cloud layers at that spot. <b>Hover or tap a ▲</b> for the peak's status.</li>
+          <li><b>Top-left list:</b> peaks above the clouds now. <b>Bottom-left table:</b> the next 48 h for the highest and favourite peaks – click a cell to jump to that hour.</li>
+          <li><b>Colours:</b> <span class="sw" style="background:#7d8087"></span>in cloud · <span class="sw" style="background:#96c8f0"></span><span class="sw" style="background:#46a55a"></span><span class="sw" style="background:#ebc332"></span><span class="sw" style="background:#cd463c"></span><span class="sw" style="background:#0a0a0a"></span>above clouds with cloud cover 6–8 / 4–6 / 2–4 / 1–2 / 0 oktas · <span class="sw" style="background:#b078dc"></span>fog (estimated) · no colour = below cloud base or no clouds.</li>
+          <li><b>Peaks ▲:</b> <span class="sw" style="background:#3fb950"></span>above clouds · <span class="sw" style="background:#9aa4ae"></span>in cloud · <span class="sw" style="background:#58a6ff"></span>below clouds · <span class="sw" style="background:#e3b341"></span>no clouds. Dashed outline = uncertain (small margin).</li>
+          <li>The first load can take a couple of minutes (LOADING banner); data is then cached for 3 hours.</li>
+        </ul>
+      </div>
+      <div lang="pl">
+        <h3>Polski</h3>
+        <ul>
+          <li><b>Co pokazuje:</b> gdzie teren wznosi się <i>ponad wierzchołek warstwy chmur</i> (widok „morza chmur"), a także mgłę i szczyty, na najbliższe 48 godzin.</li>
+          <li><b>Godzina</b> – wybór godziny prognozy. <b>Próg chmury</b> – zachmurzenie (%) uznawane za warstwę. <b>Próg mgły</b> – wilgotność (RH) uznawana za mgłę. <b>Szczyty ≥</b> – minimalna wysokość pokazywanych szczytów. <b>Krycie</b> – siła nakładki. <b>EN | PL</b> – język mapy.</li>
+          <li><b>Kliknij mapę</b>, aby zobaczyć wysokość terenu i warstwy chmur w tym miejscu. <b>Najedź lub dotknij ▲</b>, aby zobaczyć stan szczytu.</li>
+          <li><b>Lista w lewym górnym rogu:</b> szczyty ponad chmurami teraz. <b>Tabela w lewym dolnym rogu:</b> najbliższe 48 h dla najwyższych i wybranych szczytów – kliknij komórkę, aby przejść do tej godziny.</li>
+          <li><b>Kolory:</b> <span class="sw" style="background:#7d8087"></span>w chmurze · <span class="sw" style="background:#96c8f0"></span><span class="sw" style="background:#46a55a"></span><span class="sw" style="background:#ebc332"></span><span class="sw" style="background:#cd463c"></span><span class="sw" style="background:#0a0a0a"></span>ponad chmurami przy zachmurzeniu 6–8 / 4–6 / 2–4 / 1–2 / 0 okt. · <span class="sw" style="background:#b078dc"></span>mgła (szacunek) · brak koloru = pod podstawą chmur lub bez chmur.</li>
+          <li><b>Szczyty ▲:</b> <span class="sw" style="background:#3fb950"></span>ponad chmurami · <span class="sw" style="background:#9aa4ae"></span>w chmurze · <span class="sw" style="background:#58a6ff"></span>pod chmurami · <span class="sw" style="background:#e3b341"></span>bez chmur. Przerywany kontur = niepewne (mały zapas).</li>
+          <li>Pierwsze ładowanie może potrwać kilka minut (napis LOADING); potem dane są pamiętane przez 3 godziny.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note">Estimates from weather-model data (Open-Meteo / DWD ICON), for orientation only – not a substitute for official mountain forecasts. · Szacunki z danych modelu pogodowego (Open-Meteo / DWD ICON), tylko orientacyjne – nie zastępują oficjalnych prognoz górskich. · Esc / X</div>
+  </div>
+</div>
+<script>
+'use strict';
+// ==PURE-START==
+// ---------- obszar: północ = linia Görlitz–Jelenia Góra–Strzegom–Rogów Sobócki–Strzelin–Nysa, południe = linia czesko-opolska ----------
+// Współrzędne [lat, lon]. Rogów Sobócki wg Wikipedii; pozostałe miejscowości przybliżone (widoczne jako kropki z nazwą).
+const POLY_N = [[51.152, 14.987], [50.904, 15.729], [50.960, 16.349], [50.929, 16.759], [50.783, 17.067], [50.475, 17.334]];
+const POLY_S = [   // Nysa, Krnov, Bruntál, Mohelnice, Hradec Králové, Turnov, Liberec, Bogatynia, Görlitz
+  [50.475, 17.334], [50.090, 17.703], [49.988, 17.464], [49.777, 16.917], [50.210, 15.832],
+  [50.587, 15.156], [50.771, 15.056], [50.900, 14.960], [51.152, 14.987]
+];
+const POLY = POLY_N.concat(POLY_S.slice(1, -1));
+const BBOX = { latMin: 49.76, latMax: 51.18, lonMin: 14.92, lonMax: 17.75 };
+const CFG = {
+  dLat: 0.0065, dLon: 0.0105,        // komórka terenu ~720 m
+  wLat: 0.063, wLon: 0.1,             // siatka pogodowa ~7 km (zagęszczana 2×2 powyżej denseAbove)
+  hLat: 0.135, hLon: 0.2145,         // rzadka siatka (~15 km) tylko dla wysokości poziomów ciśnienia
+  px: 3, TZ: 10, batch: 20, msPerLoc: 150, denseAbove: 700, cacheMs: 3 * 3600e3,   // msPerLoc: min. odstęp między startami zapytań na każdy punkt w paczce (150 ms ≈ 400 punktów/min przy limicie 600) fogDepth: 150, peakUnc: 300, tableN: 10,
+  levels: [975, 950, 925, 900, 850, 800, 700]
+};
+const KX = Math.cos(50.5 * Math.PI / 180);
+
+function inPoly(lat, lon) {
+  let ins = false;
+  for (let i = 0, j = POLY.length - 1; i < POLY.length; j = i++) {
+    const [yi, xi] = POLY[i], [yj, xj] = POLY[j];
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) ins = !ins;
+  }
+  return ins;
+}
+const ROWS = Math.floor((BBOX.latMax - BBOX.latMin) / CFG.dLat) + 1;
+const COLS = Math.floor((BBOX.lonMax - BBOX.lonMin) / CFG.dLon) + 1;
+const cellLat = r => BBOX.latMax - r * CFG.dLat;
+const cellLon = c => BBOX.lonMin + c * CFG.dLon;
+
+function buildInside() {
+  const a = new Uint8Array(ROWS * COLS);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) a[r * COLS + c] = inPoly(cellLat(r), cellLon(c)) ? 1 : 0;
+  return a;
+}
+// Punkty pogodowe: bloki ~5 km; blok z terenem > denseAbove m dostaje 4 punkty (co ~2,5 km), pozostałe 1 punkt
+function buildWeatherPoints(inside, elev) {
+  const blocks = new Map();
+  for (let k = 0; k < ROWS * COLS; k++) {
+    if (!inside[k]) continue;
+    const bi = Math.floor((cellLat((k / COLS) | 0) - BBOX.latMin) / CFG.wLat), bj = Math.floor((cellLon(k % COLS) - BBOX.lonMin) / CFG.wLon);
+    const key = bi * 1000 + bj, e = elev[k];
+    blocks.set(key, Math.max(blocks.get(key) ?? -1e9, e));
+  }
+  const pts = [], f = v => +v.toFixed(4);
+  for (const [key, mx] of blocks) {
+    const lat0 = BBOX.latMin + Math.floor(key / 1000) * CFG.wLat, lon0 = BBOX.lonMin + (key % 1000) * CFG.wLon;
+    if (mx > CFG.denseAbove) for (const a of [0.25, 0.75]) for (const b of [0.25, 0.75]) pts.push([f(lat0 + a * CFG.wLat), f(lon0 + b * CFG.wLon)]);
+    else pts.push([f(lat0 + 0.5 * CFG.wLat), f(lon0 + 0.5 * CFG.wLon)]);
+  }
+  return pts;
+}
+// Rzadka siatka (~15 km): wysokości poziomów ciśnienia zmieniają się płynnie, więc nie pobieramy ich dla każdego punktu
+function buildCoarsePoints(inside) {
+  const set = new Set();
+  for (let k = 0; k < ROWS * COLS; k++) if (inside[k])
+    set.add(Math.floor((cellLat((k / COLS) | 0) - BBOX.latMin) / CFG.hLat) * 1000 + Math.floor((cellLon(k % COLS) - BBOX.lonMin) / CFG.hLon));
+  return [...set].map(key => [+(BBOX.latMin + (Math.floor(key / 1000) + 0.5) * CFG.hLat).toFixed(4), +(BBOX.lonMin + ((key % 1000) + 0.5) * CFG.hLon).toFixed(4)]);
+}
+// Dopisuje punktom pogodowym wysokości poziomów (IDW z 4 najbliższych punktów rzadkiej siatki)
+function attachHeights(pts, coords, hPts, hCoords) {
+  pts.forEach((pt, i) => {
+    const best = hCoords.map((c, j) => [((c[1] - coords[i][1]) * KX) ** 2 + (c[0] - coords[i][0]) ** 2, j]).sort((a, b) => a[0] - b[0]).slice(0, 4);
+    const ws = best.map(b => 1 / (b[0] + 1e-8)), sum = ws.reduce((a, b) => a + b, 0), n = pt.hourly.time.length;
+    for (const p of CFG.levels) {
+      const key = `geopotential_height_${p}hPa`, arr = new Array(n);
+      for (let t = 0; t < n; t++) {
+        let v = 0, ok = true;
+        best.forEach((b, m) => { const x = hPts[b[1]].hourly[key]?.[t]; if (x == null) ok = false; else v += x * ws[m] / sum; });
+        arr[t] = ok ? v : null;
+      }
+      pt.hourly[key] = arr;
+    }
+  });
+}
+// 4 najbliższe punkty pogodowe dla każdej komórki (wagi 1/d²)
+function buildNeighbors(inside, pts) {
+  const K = 4, n = ROWS * COLS, nbI = new Int32Array(n * K).fill(-1), nbW = new Float32Array(n * K);
+  const X = pts.map(p => p[1] * KX), Y = pts.map(p => p[0]);
+  for (let k = 0; k < n; k++) {
+    if (!inside[k]) continue;
+    const y = cellLat((k / COLS) | 0), x = cellLon(k % COLS) * KX;
+    const bd = [1e9, 1e9, 1e9, 1e9], bi = [-1, -1, -1, -1];
+    for (let p = 0; p < pts.length; p++) {
+      const d = (X[p] - x) ** 2 + (Y[p] - y) ** 2;
+      if (d >= bd[3]) continue;
+      let m = 3; while (m > 0 && bd[m - 1] > d) { bd[m] = bd[m - 1]; bi[m] = bi[m - 1]; m--; }
+      bd[m] = d; bi[m] = p;
+    }
+    let sum = 0; const w = bd.map(d => 1 / (d + 1e-8)); w.forEach(v => sum += v);
+    for (let m = 0; m < K; m++) { nbI[k * K + m] = bi[m]; nbW[k * K + m] = w[m] / sum; }
+  }
+  return { nbI, nbW };
+}
+// Warstwy chmur w kolumnie z poziomów ciśnienia (cloud_cover_XhPa jest szacowane z RH przez Open-Meteo)
+function layersAt(pt, t, thr) {
+  const H = pt.hourly, ground = pt.elevation;
+  const lv = [];
+  for (const p of CFG.levels) {
+    const g = H[`geopotential_height_${p}hPa`]?.[t], c = H[`cloud_cover_${p}hPa`]?.[t];
+    if (g == null || c == null || g <= ground + 30) continue;
+    lv.push({ g, c });
+  }
+  lv.sort((a, b) => a.g - b.g);
+  const layers = []; let cur = null;
+  for (let i = 0; i < lv.length; i++) {
+    if (lv[i].c >= thr) {
+      if (!cur) cur = { base: i === 0 ? ground : (lv[i - 1].g + lv[i].g) / 2, top: lv[i].g };
+      else cur.top = lv[i].g;
+    } else if (cur) { cur.top = (cur.top + lv[i].g) / 2; layers.push(cur); cur = null; }
+  }
+  if (cur) layers.push(cur);
+  const low = H.cloud_cover_low?.[t], mid = H.cloud_cover_mid?.[t];
+  for (const L of layers) {
+    const cc = L.base < 3000 ? low : mid;
+    L.okt = cc == null ? null : Math.max(0, Math.min(8, Math.round(cc / 12.5)));
+  }
+  return layers;
+}
+function classify(layers, h) {
+  for (const L of layers) if (h >= L.base && h <= L.top) return 'c';
+  let best = null;
+  for (const L of layers) if (L.top < h && (!best || L.top > best.top)) best = L;
+  return best && best.okt != null ? 'a' + best.okt : 'n';
+}
+// Szczyty: stała lista [nazwa, wysokość m, szerokość N, długość E]. Źródło: ręczna lista użytkownika, współrzędne z OpenStreetMap (jednorazowy eksport, plik szczyty_osm.xlsx).
+const MANUAL_PEAKS = [
+  ["Czerniec", 891, 50.189286, 16.580042],
+  ["Anensky vrch", 995, 50.215929, 16.513107],
+  ["Zaklety", 991, 50.234557, 16.449617],
+  ["Jagodna", 997, 50.252457, 16.564419],
+  ["Velká Deštná", 1116, 50.301580, 16.397839],
+  ["Šerlich", 1027, 50.330435, 16.381732],
+  ["Orlica", 1084, 50.353249, 16.360629],
+  ["Feistův kopec", 711, 50.379367, 16.319083],
+  ["Šibeník", 655, 50.363387, 16.255095],
+  ["Na Vartě", 618, 50.373120, 16.203305],
+  ["Grodziec", 803, 50.413404, 16.333120],
+  ["Narożnik", 849, 50.459840, 16.347238],
+  ["Szczeliniec Wielki", 922, 50.484814, 16.341006],
+  ["Góra Wszystkich Świętych", 647, 50.550835, 16.521304],
+  ["Góra Świętej Anny", 647, 50.566606, 16.502111],
+  ["Gołębia", 810, 50.590556, 16.605278],
+  ["Kalenica", 964, 50.642778, 16.546389],
+  ["Wielka Sowa", 1015, 50.680278, 16.485556],
+  ["Gontowa", 723, 50.643611, 16.458889],
+  ["Włodzicka Góra", 755, 50.625593, 16.433681],
+  ["Włodarz", 811, 50.695419, 16.410234],
+  ["Gomólnik Mały", 809, 50.686832, 16.321798],
+  ["Borowa", 853, 50.722867, 16.304465],
+  ["Jeleniec", 901, 50.690552, 16.311457],
+  ["Waligóra", 933, 50.680825, 16.278088],
+  ["Suchawa", 928, 50.680711, 16.265595],
+  ["Ruprechtický Špičák", 880, 50.661433, 16.280828],
+  ["Lesista Wielka", 858, 50.702356, 16.191411],
+  ["Dzikowiec", 836, 50.724045, 16.205654],
+  ["Chełmiec", 851, 50.779550, 16.210974],
+  ["Trójgarb", 778, 50.812755, 16.163662],
+  ["Lisi Kamień", 602, 50.783598, 16.305978],
+  ["Góra Powstańców", 497, 50.771755, 16.284955],
+  ["Wzgórze Gedymina", 532, 50.793919, 16.270624],
+  ["Skiba", 433, 50.840494, 16.286196],
+  ["Róg", 715, 50.673550, 16.097944],
+  ["Krucza Skała", 685, 50.687572, 16.011634],
+  ["Královecký Špičák", 880, 50.657527, 15.988565],
+  ["Žaltman", 740, 50.552586, 16.052173],
+  ["Bożanovský Špičák", 781, 50.514119, 16.314391],
+  ["Koruna", 772, 50.521990, 16.324384],
+  ["Velká kupa", 713, 50.531848, 16.310076],
+  ["Supí hnízdo", 702, 50.564006, 16.276080],
+  ["Panna", 686, 50.577498, 16.258255],
+  ["Ostaš", 700, 50.560897, 16.206914],
+  ["Čáp", 786, 50.574612, 16.124135],
+  ["Zawodna", 445, 51.044594, 15.903437],
+  ["Ostrzyca Proboszczowicka", 501, 51.055996, 15.763269],
+  ["Okole", 725, 50.980736, 15.817941],
+  ["Krzyżna Góra", 653, 50.864154, 15.868281],
+  ["Lwia Góra", 718, 50.844898, 15.905358],
+  ["Skalnik", 945, 50.808479, 15.900058],
+  ["Wielka Kopa", 870, 50.812591, 15.957999],
+  ["Kutna", 1002, 50.660536, 15.849768],
+  ["Černá hora", 1300, 50.652831, 15.741844],
+  ["Łysocina", 1190, 50.725324, 15.830149],
+  ["Liščí hora", 1363, 50.693066, 15.688543],
+  ["Růžová hora", 1393, 50.720982, 15.738944],
+  ["Czoło", 1270, 50.755232, 15.812911],
+  ["Skalny Stół", 1284, 50.752921, 15.792164],
+  ["Czarna Kopa", 1411, 50.742639, 15.769642],
+  ["Śnieżka", 1603, 50.736033, 15.739607],
+  ["Luční hora", 1555, 50.727772, 15.682756],
+  ["Krakonoš", 1422, 50.734011, 15.665456],
+  ["Kopa nad Moreną", 1390, 50.750455, 15.695893],
+  ["Smogornia", 1490, 50.755833, 15.675556],
+  ["Ptasi Kamień", 1216, 50.764168, 15.628375],
+  ["Wielki Szyszak", 1510, 50.776918, 15.567787],
+  ["Vysoká pláň", 1497, 50.778769, 15.557299],
+  ["Łabski Szczyt", 1492, 50.780446, 15.545643],
+  ["Kotel", 1435, 50.752511, 15.529476],
+  ["Szrenica", 1361, 50.791479, 15.514064],
+  ["Plešivec", 1209, 50.760884, 15.479515],
+  ["Čertova hora", 1022, 50.761727, 15.430418],
+  ["Hvězda", 959, 50.746517, 15.366020],
+  ["Tanvaldský Špičák", 812, 50.751489, 15.282272],
+  ["Černá studnice", 872, 50.711674, 15.233725],
+  ["Světlý vrch", 729, 50.763917, 15.292620],
+  ["Bukovec", 1005, 50.814355, 15.357855],
+  ["Jizera", 1122, 50.833964, 15.259534],
+  ["Paličník", 944, 50.871467, 15.257581],
+  ["Smrk", 1124, 50.889127, 15.273058],
+  ["Stóg Izerski", 1107, 50.891003, 15.303822],
+  ["Czerniawska Kopa", 775, 50.911366, 15.289623],
+  ["Młynica", 653, 50.913775, 15.313699],
+  ["Świeradowiec", 1036, 50.883188, 15.329978],
+  ["Wysoka Kopa", 1127, 50.850000, 15.420278],
+  ["Izerskie Garby", 1084, 50.851728, 15.436573],
+  ["Wysoki Kamień", 1058, 50.845503, 15.491614],
+  ["Ślęża", 719, 50.864087, 16.707496],
+  ["Radunia", 577, 50.837555, 16.710057],
+  ["Szczytna", 466, 50.817968, 16.632867],
+  ["Gromnik", 390, 50.702343, 17.110115],
+  ["Biskupia Kopa", 889, 50.256695, 17.428575],
+  ["Medvědí vrch", 1216, 50.159787, 17.311988],
+  ["Praděd", 1491, 50.083235, 17.230869],
+  ["Jelenka", 1214, 50.025465, 17.207104],
+  ["Břidličná hora", 1358, 50.033087, 17.186784],
+  ["Kamenný vrch", 964, 49.963759, 17.100006],
+  ["Červená hora", 1333, 50.144248, 17.135975],
+  ["Vozka", 1377, 50.153029, 17.108474],
+  ["Keprník", 1423, 50.170941, 17.116442],
+  ["Šerák", 1351, 50.186616, 17.106654],
+  ["Háj", 631, 49.970726, 16.933845],
+  ["Háječek", 603, 49.937771, 16.836171],
+  ["Cukrová bouda", 591, 49.883709, 16.729902],
+  ["Lazek", 715, 49.925808, 16.705488],
+  ["Jeřáb", 1003, 50.056616, 16.812743],
+  ["Buková hora", 958, 50.009574, 16.709529],
+  ["Suchý vrch", 995, 50.050775, 16.693393],
+  ["Trójmorski Wierch", 1145, 50.156981, 16.790525],
+  ["Slamník", 1232, 50.154559, 16.838061],
+  ["Sušina", 1321, 50.173766, 16.863315],
+  ["Mały Śnieżnik", 1326, 50.192413, 16.814703],
+  ["Śnieżnik", 1423, 50.207408, 16.847424],
+  ["Štvanice", 866, 50.170291, 16.898781],
+  ["Rudawiec", 1106, 50.244804, 16.976858],
+  ["Brousek", 1116, 50.227293, 17.024596],
+  ["Smrk", 1127, 50.230571, 17.033543],
+  ["Czernica", 1083, 50.272222, 16.965278],
+  ["Trojak", 765, 50.338344, 16.911463],
+  ["Igliczna", 845, 50.244452, 16.749359],
+  ["Suchoń", 964, 50.272972, 16.776196],
+  ["Czarna Góra", 1204, 50.251859, 16.804935],
+  ["Żmijowiec", 1153, 50.234090, 16.824854],
+  ["Borówkowa", 899, 50.390538, 16.902724],
+  ["Jawornik Wielki", 872, 50.406862, 16.851093],
+  ["Kłodzka Góra", 757, 50.451670, 16.753221],
+  ["Kalwaria", 575, 50.495556, 16.748889]
+];
+// Stan szczytu względem chmur: above (ponad), in (w chmurze), under (pod podstawą), clear (bez chmur)
+function peakState(layers, h) {
+  for (const L of layers) if (h >= L.base && h <= L.top) return { st: 'in', margin: Math.min(h - L.base, L.top - h), base: L.base, top: L.top };
+  let below = null, above = null;
+  for (const L of layers) {
+    if (L.top < h && (!below || L.top > below.top)) below = L;
+    if (L.base > h && (!above || L.base < above.base)) above = L;
+  }
+  if (below) return { st: 'above', margin: h - below.top, top: below.top, okt: below.okt };
+  if (above) return { st: 'under', margin: above.base - h, base: above.base };
+  return { st: 'clear', margin: Infinity };
+}
+// Czy kafelek mapy (x, y, z) przecina obszar? Tylko takie kafelki są pobierane.
+const tileLon = (x, z) => x / 2 ** z * 360 - 180;
+const tileLat = (y, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI;
+function segCross(a, b, c, d) {
+  const o = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
+}
+function tileHitsPoly(x, y, z) {
+  const w = tileLon(x, z), e = tileLon(x + 1, z), n = tileLat(y, z), s = tileLat(y + 1, z);
+  if (inPoly(n, w) || inPoly(n, e) || inPoly(s, w) || inPoly(s, e)) return true;
+  for (const [la, lo] of POLY) if (la <= n && la >= s && lo >= w && lo <= e) return true;
+  const rect = [[w, n], [e, n], [e, s], [w, s]];
+  for (let i = 0; i < POLY.length; i++) {
+    const a = [POLY[i][1], POLY[i][0]], q = POLY[(i + 1) % POLY.length], b = [q[1], q[0]];
+    for (let k = 0; k < 4; k++) if (segCross(a, b, rect[k], rect[(k + 1) % 4])) return true;
+  }
+  return false;
+}
+// ==PURE-END==
+
+// ---------- kolory ----------
+const C_IN = 'rgba(125,128,135,0.70)';
+const C_FOG = 'rgba(176,120,220,0.60)';   // mgła (szacunek z wilgotności 2 m)
+const PCOL = { above: '#3fb950', in: '#9aa4ae', under: '#58a6ff', clear: '#e3b341' };
+const C_ABOVE = ['rgba(10,10,10,0.40)', 'rgba(205,70,60,0.50)', 'rgba(205,70,60,0.50)', 'rgba(235,195,50,0.50)', 'rgba(235,195,50,0.50)',
+  'rgba(70,165,90,0.50)', 'rgba(70,165,90,0.50)', 'rgba(150,200,240,0.60)', 'rgba(150,200,240,0.60)'];
+
+const $ = id => document.getElementById(id);
+let LANG = 'en';
+try { LANG = localStorage.getItem('lang') === 'pl' ? 'pl' : 'en'; } catch (e) {}
+const T2 = (pl, en) => LANG === 'pl' ? pl : en;                 // tekst dwujęzyczny wybierany w miejscu użycia
+const E2 = (pl, en) => Object.assign(new Error(pl), { en });     // błąd z dwiema wersjami językowymi
+let lastStatus = { pl: '', en: '', err: false };
+const setStatus = (pl, en, err) => {
+  lastStatus = { pl, en, err: !!err };
+  const el = $('status'); el.textContent = T2(pl, en); el.className = err ? 'err' : '';
+};
+const setLoading = on => $('loading').classList.toggle('on', on);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------- mapa z blokadą wyjazdu poza obszar ----------
+const areaBounds = L.latLngBounds([BBOX.latMin, BBOX.lonMin], [BBOX.latMax, BBOX.lonMax]);
+const map = L.map('map', { maxBoundsViscosity: 1.0 });
+map.fitBounds(areaBounds);
+const lockBounds = areaBounds.pad(0.05);
+map.setMaxBounds(lockBounds);
+map.setMinZoom(map.getBoundsZoom(lockBounds));
+const PolyTiles = L.TileLayer.extend({
+  _isValidTile(c) { return L.TileLayer.prototype._isValidTile.call(this, c) && tileHitsPoly(c.x, c.y, c.z); }
+});
+new PolyTiles('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 15, attribution: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap' }).addTo(map);
+// maska: zakrywa wszystko poza obszarem (dziura = obszar)
+map.createPane('mask'); map.getPane('mask').style.zIndex = 250;
+L.polygon([[[30, -10], [30, 45], [65, 45], [65, -10]], POLY], { pane: 'mask', stroke: false, fillColor: '#222222', fillOpacity: 1, interactive: false }).addTo(map);
+L.polygon(POLY, { color: '#fff', weight: 1.5, fill: false, opacity: .6 }).addTo(map);
+const namesN = ['Görlitz', 'Jelenia Góra', 'Strzegom', 'Rogów Sobócki', 'Strzelin', 'Nysa'];
+POLY_N.forEach((p, i) => L.circleMarker(p, { radius: 3, color: '#ffd24a', weight: 1, fillOpacity: .9 }).addTo(map).bindTooltip(namesN[i]));
+const names = ['Nysa', 'Krnov', 'Bruntál', 'Mohelnice', 'Hradec Králové', 'Turnov', 'Liberec', 'Bogatynia', 'Görlitz'];
+POLY_S.forEach((p, i) => L.circleMarker(p, { radius: 3, color: '#7fd4ff', weight: 1, fillOpacity: .9 }).addTo(map).bindTooltip(names[i]));
+map.createPane('peaks'); map.getPane('peaks').style.zIndex = 450;
+const peakCtl = L.control({ position: 'topleft' });
+peakCtl.onAdd = () => { const d = L.DomUtil.create('div', 'peaks'); d.id = 'peaklist'; d.textContent = T2('Szczyty: czekam na dane…', 'Peaks: waiting for data…'); L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); return d; };
+peakCtl.addTo(map);
+let winOpen = true;
+const winHead = () => { const h = document.querySelector('.win .wh'); if (h) h.textContent = (winOpen ? '▼' : '▶') + ' ' + T2('Okna ponad chmurami (48 h)', 'Windows above the clouds (48 h)'); };
+const winCtl = L.control({ position: 'bottomleft' });
+winCtl.onAdd = () => {
+  const d = L.DomUtil.create('div', 'win');
+  d.innerHTML = '<div class="wh"></div><div class="wb" id="wintable"></div>';
+  L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+  d.querySelector('.wh').addEventListener('click', () => {
+    winOpen = !winOpen; $('wintable').style.display = winOpen ? '' : 'none'; winHead();
+  });
+  d.addEventListener('click', e => { const td = e.target.closest('td[data-t]'); if (td) { $('hour').value = td.dataset.t; render(); } });
+  d.addEventListener('mouseover', e => { const td = e.target.closest('td.c'); if (td && !td.title) td.title = cellTitle(+td.dataset.r, +td.dataset.t); });
+  return d;
+};
+winCtl.addTo(map);
+
+function legendHTML() {
+  const row = (c, t) => `<div><i style="background:${c}"></i>${t}</div>`;
+  const ab = r => T2(`nad chmurami, ${r} okt.`, `above clouds, ${r} oktas`);
+  return `<b>${T2('Teren względem chmur', 'Terrain vs. clouds')}</b>` + row(C_IN, T2('w chmurze', 'in cloud')) +
+    row(C_FOG, T2('mgła (szacunek z wilgotności)', 'fog (estimated from humidity)')) +
+    row(C_ABOVE[8], ab('6–8')) + row(C_ABOVE[6], ab('4–6')) + row(C_ABOVE[4], ab('2–4')) + row(C_ABOVE[2], ab('1–2')) + row(C_ABOVE[0], ab('0')) +
+    `<div style="color:#8b99a6">${T2('brak koloru: pod podstawą chmur lub bez chmur', 'no colour: below cloud base or no clouds')}</div>` +
+    `<div style="margin-top:4px"><b>${T2('Szczyty', 'Peaks')}</b></div>` +
+    row(PCOL.above, T2('ponad chmurami', 'above clouds')) + row(PCOL.in, T2('w chmurze', 'in cloud')) + row(PCOL.under, T2('pod chmurami', 'below clouds')) + row(PCOL.clear, T2('bez chmur', 'no clouds')) +
+    `<div style="color:#8b99a6">${T2('▲ pulsujący trójkąt; przerywany kontur = niepewne', '▲ pulsing triangle; dashed outline = uncertain')}</div>`;
+}
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => { const d = L.DomUtil.create('div', 'legend'); d.innerHTML = legendHTML(); return d; };
+legend.addTo(map);
+// przełącznik języka nad legendą (kontrolka dodana później leży wyżej w tym samym rogu)
+const langCtl = L.control({ position: 'bottomright' });
+langCtl.onAdd = () => {
+  const d = L.DomUtil.create('div', 'lang');
+  d.innerHTML = '<span class="lg" data-l="en">EN</span> | <span class="lg" data-l="pl">PL</span>';
+  L.DomEvent.disableClickPropagation(d);
+  d.addEventListener('click', e => { const b = e.target.closest('.lg'); if (b) { LANG = b.dataset.l; try { localStorage.setItem('lang', LANG); } catch (err) {} applyLang(); } });
+  return d;
+};
+langCtl.addTo(map);
+
+// ---------- dane ----------
+let inside, wPts = [], wCoords = [], hCoords = [], elev = null, nb = null, overlay = null, lastLayers = [];
+let peaks = [], peakMarkers = [], fogRH = null, nowIdx = 0, peakNote = { pl: '', en: '' };
+
+async function getJSON(url, lb) {   // lb = [etykieta PL, etykieta EN]
+  let n429 = 0, nErr = 0;
+  for (;;) {
+    let r = null, wait, msg;   // msg = [PL, EN]
+    try { r = await fetch(url); } catch (e) { msg = [`${lb[0]}: brak odpowiedzi (${e.message})`, `${lb[1]}: no response (${e.message})`]; }
+    if (r && r.ok) return await r.json();
+    if (r && r.status === 429) {
+      n429++;
+      CFG.msPerLoc = Math.min(CFG.msPerLoc * 1.5, 400);   // po 429 zwalniamy kolejne paczki
+      let why = ''; try { why = (await r.text()).toLowerCase(); } catch (e) {}
+      if (why.includes('daily')) throw E2(`${lb[0]}: wyczerpany dobowy limit Open-Meteo, wróć jutro (pobrane punkty są zapamiętane)`, `${lb[1]}: Open-Meteo daily limit exhausted, come back tomorrow (downloaded points are saved)`);
+      if (n429 > 16) throw E2(`${lb[0]}: limit zapytań trwa ponad godzinę, spróbuj później (pobrane punkty są zapamiętane)`, `${lb[1]}: rate limit lasts over an hour, try later (downloaded points are saved)`);
+      const hourly = why.includes('hourly') || n429 > 2;
+      wait = hourly ? 300 : 65;
+      msg = [`${lb[0]}: limit zapytań (${hourly ? 'godzinowy' : 'minutowy'})`, `${lb[1]}: rate limit (${hourly ? 'hourly' : 'per-minute'})`];
+    } else {
+      if (r && r.status < 500) throw E2(`${lb[0]}: HTTP ${r.status}`, `${lb[1]}: HTTP ${r.status}`);
+      if (++nErr > 5) throw msg ? E2(msg[0], msg[1]) : E2(`${lb[0]}: HTTP ${r.status}`, `${lb[1]}: HTTP ${r.status}`);
+      wait = 5 * nErr; msg = msg || [`${lb[0]}: HTTP ${r.status}`, `${lb[1]}: HTTP ${r.status}`];
+    }
+    const end = Date.now() + wait * 1000;   // odliczanie wg zegara (karta w tle nie wydłuża czekania)
+    for (let t = Math.ceil((end - Date.now()) / 1000); t > 0; t = Math.ceil((end - Date.now()) / 1000)) {
+      const clk = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+      setStatus(`${msg[0]}; ponawiam za ${clk}`, `${msg[1]}; retrying in ${clk}`, true);
+      await sleep(1000);
+    }
+  }
+}
+
+function tileXY(lon, lat, z) {
+  const n = 2 ** z, rad = lat * Math.PI / 180;
+  return [(lon + 180) / 360 * n, (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * n];
+}
+function loadTile(z, x, y) {
+  return new Promise((res, rej) => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 256;
+      const cx = c.getContext('2d', { willReadFrequently: true });
+      cx.drawImage(im, 0, 0); res(cx.getImageData(0, 0, 256, 256).data);
+    };
+    im.onerror = () => rej(E2(`Wysokości terenu: nie wczytano kafelka ${z}/${x}/${y}`, `Terrain heights: tile ${z}/${x}/${y} failed to load`));
+    im.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
+  });
+}
+async function loadElevations() {
+  const out = new Float32Array(ROWS * COLS).fill(NaN), pos = new Map(), need = new Set();
+  for (let k = 0; k < ROWS * COLS; k++) {
+    if (!inside[k]) continue;
+    const [tx, ty] = tileXY(cellLon(k % COLS), cellLat((k / COLS) | 0), CFG.TZ);
+    pos.set(k, [tx, ty]); need.add(Math.floor(tx) + '/' + Math.floor(ty));
+  }
+  setStatus(`Wysokości terenu: ${need.size} kafelków…`, `Terrain heights: ${need.size} tiles…`);
+  const data = {};
+  await Promise.all([...need].map(async key => { const [x, y] = key.split('/').map(Number); data[key] = await loadTile(CFG.TZ, x, y); }));
+  for (const [k, [tx, ty]] of pos) {
+    const d = data[Math.floor(tx) + '/' + Math.floor(ty)];
+    const px = Math.min(255, Math.floor((tx - Math.floor(tx)) * 256)), py = Math.min(255, Math.floor((ty - Math.floor(ty)) * 256));
+    const i = (py * 256 + px) * 4;
+    out[k] = d[i] * 256 + d[i + 1] + d[i + 2] / 256 - 32768;
+  }
+  return out;
+}
+const idbOpen = () => new Promise(res => { try { const q = indexedDB.open('cloudmap', 1); q.onupgradeneeded = () => q.result.createObjectStore('w'); q.onsuccess = () => res(q.result); q.onerror = () => res(null); } catch (e) { res(null); } });
+const idbGet = (db, key) => new Promise(res => { if (!db) return res(null); try { const q = db.transaction('w').objectStore('w').get(key); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } });
+const idbPut = (db, key, val) => new Promise(res => { if (!db) return res(); try { const tx = db.transaction('w', 'readwrite'); tx.objectStore('w').put(val, key); tx.oncomplete = () => res(); tx.onerror = () => res(); } catch (e) { res(); } });
+
+// Pobiera punkty partiami; każdy punkt trafia do cache (IndexedDB), więc po błędzie wznowienie dociąga tylko brakujące
+async function fetchPoints(model, coords, vars, prefix, batch, pause, label) {
+  const db = await idbOpen(), out = new Array(coords.length), missing = [], keyOf = i => `${prefix}${model}|${coords[i][0]}|${coords[i][1]}`;
+  await Promise.all(coords.map(async (_, i) => {
+    const v = await idbGet(db, keyOf(i));
+    if (v && v.pt && Date.now() - v.ts < CFG.cacheMs) out[i] = v.pt; else missing.push(i);
+  }));
+  missing.sort((a, b) => a - b);
+  const cached = coords.length - missing.length;
+  for (let s0 = 0; s0 < missing.length; s0 += batch) {
+    const idx = missing.slice(s0, s0 + batch), t0 = Date.now();
+    const etaS = Math.ceil((missing.length - s0) * CFG.msPerLoc / 1000);
+    const eta = etaS > 90 ? Math.ceil(etaS / 60) + ' min' : etaS + ' s';
+    setStatus(`${label[0]}: ${cached + s0}/${coords.length} (w pamięci: ${cached}), ok. ${eta} do końca…`, `${label[1]}: ${cached + s0}/${coords.length} (cached: ${cached}), about ${eta} left…`);
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${idx.map(i => coords[i][0]).join(',')}&longitude=${idx.map(i => coords[i][1]).join(',')}` +
+      `&hourly=${vars.join(',')}&models=${model}&forecast_days=2&timezone=Europe%2FWarsaw`;
+    const j = await getJSON(url, label);
+    const arr = Array.isArray(j) ? j : [j];
+    for (let m = 0; m < idx.length; m++) { out[idx[m]] = arr[m]; await idbPut(db, keyOf(idx[m]), { ts: Date.now(), pt: arr[m] }); }
+    await sleep(Math.max(0, idx.length * CFG.msPerLoc - (Date.now() - t0)));   // odstęp liczony od startu zapytania, nie od jego końca
+  }
+  return out;
+}
+
+// ---------- rysowanie ----------
+function render() {
+  if (!wPts.length || !elev || !nb) return;
+  const t = +$('hour').value, thr = +$('thr').value, fthr = +$('fog').value;
+  lastLayers = wPts.map(p => layersAt(p, t, thr));
+  const cv = document.createElement('canvas');
+  cv.width = COLS * CFG.px; cv.height = ROWS * CFG.px;
+  const ctx = cv.getContext('2d');
+  for (let k = 0; k < ROWS * COLS; k++) {
+    if (!inside[k]) continue;
+    const h = elev[k], w = {};
+    for (let m = 0; m < 4; m++) {
+      const pi = nb.nbI[k * 4 + m]; if (pi < 0) continue;
+      const cl = classify(lastLayers[pi], h); w[cl] = (w[cl] || 0) + nb.nbW[k * 4 + m];
+    }
+    let cls = Object.keys(w).reduce((a, b) => w[a] >= w[b] ? a : b, 'n');
+    if (fogRH && (cls === 'c' || cls === 'n')) {   // mgła: wilgotność 2 m ≥ próg i teren nie wyżej niż ~150 m ponad powierzchnią modelu
+      let rh = 0, ew = 0, ok = true;
+      for (let m = 0; m < 4; m++) {
+        const pi = nb.nbI[k * 4 + m]; if (pi < 0) continue;
+        const v = fogRH[pi]?.[t]; if (v == null) { ok = false; break; }
+        rh += v * nb.nbW[k * 4 + m]; ew += wPts[pi].elevation * nb.nbW[k * 4 + m];
+      }
+      if (ok && rh >= fthr && h <= ew + CFG.fogDepth) cls = 'f';
+    }
+    if (cls === 'n') continue;
+    ctx.fillStyle = cls === 'c' ? C_IN : cls === 'f' ? C_FOG : C_ABOVE[+cls.slice(1)];
+    ctx.fillRect((k % COLS) * CFG.px, ((k / COLS) | 0) * CFG.px, CFG.px, CFG.px);
+  }
+  const hl = CFG.dLat / 2, hn = CFG.dLon / 2;
+  const bounds = [[cellLat(ROWS - 1) - hl, cellLon(0) - hn], [cellLat(0) + hl, cellLon(COLS - 1) + hn]];
+  if (overlay) map.removeLayer(overlay);
+  overlay = L.imageOverlay(cv.toDataURL(), bounds, { opacity: +$('opa').value / 100, className: 'cloudimg', interactive: false }).addTo(map);
+  $('when').textContent = wPts[0].hourly.time[t].replace('T', ' ');
+  $('thrv').textContent = thr + '%';
+  $('fogv').textContent = fthr + '%';
+  updatePeaks();
+  renderTable();
+}
+
+map.on('click', e => {
+  if (!wPts.length || !elev || !nb) return;
+  const r = Math.round((BBOX.latMax - e.latlng.lat) / CFG.dLat), c = Math.round((e.latlng.lng - BBOX.lonMin) / CFG.dLon);
+  if (r < 0 || c < 0 || r >= ROWS || c >= COLS || !inside[r * COLS + c]) return;
+  const k = r * COLS + c, pi = nb.nbI[k * 4], lay = lastLayers[pi], H = wPts[pi].hourly, t = +$('hour').value;
+  const f = v => v == null ? '–' : Math.round(v);
+  const txt = lay.length ? lay.map(x => `${Math.round(x.base)}–${Math.round(x.top)} m (${x.okt ?? '?'}/8)`).join('<br>') : T2('brak warstw chmur', 'no cloud layers');
+  const dbg = CFG.levels.map(p => `${p} hPa: ${f(H['geopotential_height_' + p + 'hPa'][t])} m, ${f(H['cloud_cover_' + p + 'hPa'][t])}%`).join('<br>');
+  L.popup().setLatLng(e.latlng).setContent(`${T2('Teren', 'Terrain')}: <b>${Math.round(elev[k])} m</b> (model: ${Math.round(wPts[pi].elevation)} m)<br>${T2('Warstwy chmur', 'Cloud layers')}:<br>${txt}` +
+    `<br><small>${T2('Zachm. niskie', 'Low cloud')} ${f(H.cloud_cover_low[t])}%, ${T2('średnie', 'mid')} ${f(H.cloud_cover_mid[t])}%<br>${dbg}</small>`).openOn(map);
+});
+
+const stLab = () => ({ above: T2('ponad chmurami', 'above clouds'), in: T2('w chmurze', 'in cloud'), under: T2('pod chmurami', 'below clouds'), clear: T2('bez chmur', 'no clouds') });
+const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------- szczyty ----------
+function peakIcon(col, unc) {
+  const svg = `<svg width="22" height="21" viewBox="0 0 28 26"><polygon points="14,2 26,23 2,23" fill="${col}" fill-opacity="${unc ? 0.3 : 1}" stroke="#ff2a4d" stroke-width="2" stroke-linejoin="round"${unc ? ' stroke-dasharray="5 3"' : ''}/></svg>`;
+  return L.divIcon({ html: `<div class="pk${unc ? ' u' : ''}">${svg}</div>`, className: '', iconSize: [22, 21], iconAnchor: [11, 12] });
+}
+// Szczyty ze stałej listy; leżące poza obszarem są pomijane (brak punktów pogodowych) i wymienione w komunikacie
+function buildPeaks() {
+  const out = [], outside = [];
+  for (const [name, ele, lat, lon] of MANUAL_PEAKS) {
+    if (!inPoly(lat, lon)) { outside.push(name); continue; }
+    out.push({ name, ele, lat, lon, watch: true });   // watch: nie podlega usuwaniu „dubli" w promieniu 2 km
+  }
+  peakNote = outside.length ? { pl: `Poza obszarem (pominięte): ${outside.join(', ')}.`, en: `Outside the area (skipped): ${outside.join(', ')}.` } : { pl: '', en: '' };
+  return out;
+}
+function initPeaks() {
+  peaks.sort((a, b) => (b.watch ? 1 : 0) - (a.watch ? 1 : 0) || b.ele - a.ele);   // szczyty z listy użytkownika najpierw: nigdy nie odpadają jako dubel
+  const kept = [];
+  for (const p of peaks) if (p.watch || !kept.some(q => Math.hypot((q.lon - p.lon) * KX, q.lat - p.lat) * 111 < 2)) kept.push(p);
+  peaks = kept.sort((a, b) => b.ele - a.ele);
+  for (const p of peaks) {
+    const best = wCoords.map((c, i) => [((c[1] - p.lon) * KX) ** 2 + (c[0] - p.lat) ** 2, i]).sort((a, b) => a[0] - b[0]).slice(0, 4);
+    const ws = best.map(b => 1 / (b[0] + 1e-8)), sum = ws.reduce((a, b) => a + b, 0);
+    p.nb = best.map(b => b[1]); p.w = ws.map(v => v / sum);
+  }
+  peakMarkers = peaks.map(p => L.marker([p.lat, p.lon], { pane: 'peaks', icon: peakIcon('#888', false) }).bindTooltip('x', { direction: 'top', offset: [0, -12] }));
+}
+function peakInfo(p, t) {   // t == null: bieżąca godzina z suwaka
+  const thr = +$('thr').value;
+  const st = p.nb.map(i => peakState(t == null ? lastLayers[i] : layersAt(wPts[i], t, thr), p.ele)), votes = {};
+  st.forEach((s, m) => votes[s.st] = (votes[s.st] || 0) + p.w[m]);
+  const win = Object.keys(votes).reduce((a, b) => votes[a] >= votes[b] ? a : b);
+  const rep = st.find(s => s.st === win);
+  const why = votes[win] < 0.75 ? T2('punkty pogodowe się różnią', 'neighbouring weather points disagree') : rep.margin < CFG.peakUnc ? T2(`zapas poniżej ${CFG.peakUnc} m`, `margin below ${CFG.peakUnc} m`) : '';
+  return { st: win, rep, why };
+}
+function peakText(p, inf) {
+  const s = inf.rep, lab = stLab()[inf.st];
+  let d = '';
+  if (inf.st === 'above') d = T2(`wierzchołek chmur ok. ${Math.round(s.top)} m, zapas ${Math.round(s.margin)} m`, `cloud top about ${Math.round(s.top)} m, margin ${Math.round(s.margin)} m`) + (s.okt != null ? ', ' + s.okt + '/8' : '');
+  else if (inf.st === 'in') d = T2(`warstwa ${Math.round(s.base)}–${Math.round(s.top)} m`, `layer ${Math.round(s.base)}–${Math.round(s.top)} m`);
+  else if (inf.st === 'under') d = T2(`podstawa chmur ok. ${Math.round(s.base)} m`, `cloud base about ${Math.round(s.base)} m`);
+  return `<b>${esc(p.name)}</b> ${p.ele} m<br>${lab}${inf.why ? ` <span class="u">(${T2('niepewne', 'uncertain')}: ${inf.why})</span>` : ''}${d ? '<br>' + d : ''}`;
+}
+function updatePeaks() {
+  if (!peaks.length || !lastLayers.length) return;
+  const min = +$('pmin').value, rows = [];
+  peaks.forEach((p, i) => {
+    const mk = peakMarkers[i];
+    if (p.ele < min) { if (map.hasLayer(mk)) map.removeLayer(mk); return; }
+    const inf = peakInfo(p);
+    const ik = inf.st + (inf.why ? 'u' : '');   // ikonę wymieniamy tylko przy zmianie stanu (inaczej pulsowanie by się resetowało)
+    if (mk._ik !== ik) { mk.setIcon(peakIcon(PCOL[inf.st], !!inf.why)); mk._ik = ik; }
+    mk.setTooltipContent(peakText(p, inf));
+    if (!map.hasLayer(mk)) mk.addTo(map);
+    if (inf.st === 'above') rows.push(`<div>▲ <b>${esc(p.name)}</b> ${p.ele} m, ${T2('chmury do', 'clouds up to')} ${Math.round(inf.rep.top)} m${inf.why ? ` <span class="u">(${T2('niepewne', 'uncertain')})</span>` : ''}</div>`);
+  });
+  $('peaklist').innerHTML = `<b>${T2('Szczyty ponad chmurami', 'Peaks above the clouds')}: ${rows.length}</b>` + rows.join('');
+}
+
+// ---------- tabela „okna ponad chmurami" ----------
+const DAYS = { pl: ['nd', 'pn', 'wt', 'śr', 'cz', 'pt', 'sb'], en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] };
+const dayName = s => DAYS[LANG][new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)).getDay()];
+let tblKey = '', tblTimer = null, tblRows = [];
+function renderTable() {
+  const box = $('wintable');
+  if (!box || !peaks.length || !wPts.length) return;
+  const cur = +$('hour').value, key = `${$('thr').value}|${$('pmin').value}|${LANG}|${peaks.length}|${nowIdx}`;
+  if (key === tblKey) {   // zmieniła się tylko godzina: przesuwamy ramkę zamiast przebudowywać tabelę
+    box.querySelectorAll('td.sel').forEach(e => e.classList.remove('sel'));
+    box.querySelectorAll(`td.c[data-t="${cur}"]`).forEach(e => e.classList.add('sel'));
+    return;
+  }
+  clearTimeout(tblTimer);
+  tblTimer = setTimeout(() => { tblKey = key; buildTable(); }, tblKey ? 250 : 0);
+}
+function cellTitle(ri, t) {   // opis komórki liczony dopiero po najechaniu (mniej danych w DOM)
+  const r = tblRows[ri]; if (!r) return '';
+  const x = r.inf[t];
+  return `${r.name}, ${dayName(r.T[t])} ${r.T[t].slice(11, 16)}: ${stLab()[x.st]}${x.why ? T2(' (niepewne: ', ' (uncertain: ') + x.why + ')' : ''}`;
+}
+function buildTable() {
+  const box = $('wintable'), T = wPts[0].hourly.time, n = T.length, cur = +$('hour').value;
+  let head = '<tr><th colspan="2"></th>';
+  for (let g = 0; g < n; g += 6) head += `<th colspan="${Math.min(6, n - g)}">${T[g].slice(11, 13) === '00' ? dayName(T[g]) + ' ' + T[g].slice(8, 10) + '.' + T[g].slice(5, 7) : T[g].slice(11, 13) + 'h'}</th>`;
+  let body = '', lines = '', noWin = 0;
+  tblRows = [];
+  peaks.filter(p => p.ele >= +$('pmin').value).forEach((p, ri) => {
+    const inf = T.map((_, t) => peakInfo(p, t)), nm = esc(p.name);
+    tblRows.push({ name: p.name, inf, T });
+    body += `<tr><td class="n">${nm}</td><td class="e">${p.ele} m</td>`;
+    inf.forEach((x, t) => { body += `<td class="c s${x.st[0]}${x.why ? ' q' : ''}${t < nowIdx ? ' past' : ''}${t === cur ? ' sel' : ''}" data-r="${ri}" data-t="${t}"></td>`; });
+    body += '</tr>';
+    const wins = []; let s0 = -1;
+    for (let t = 0; t < n; t++) {
+      const ab = inf[t].st === 'above';
+      if (ab && s0 < 0) s0 = t;
+      if (s0 >= 0 && (!ab || t === n - 1)) { wins.push([s0, ab ? t : t - 1]); s0 = -1; }
+    }
+    const txt = wins.filter(([, e]) => e >= nowIdx).slice(0, 4).map(([a, e]) => {
+      const u = inf.slice(a, e + 1).filter(x => x.why).length, len = e - a + 1;
+      const end = dayName(T[a]) === dayName(T[e]) ? T[e].slice(11, 16) : dayName(T[e]) + ' ' + T[e].slice(11, 16);
+      return `${dayName(T[a])} ${T[a].slice(11, 16)}–${end}${u === len ? T2(' (niepewne)', ' (uncertain)') : u ? T2(` (niepewnych godz.: ${u})`, ` (uncertain hours: ${u})`) : ''}`;
+    });
+    if (txt.length) lines += `<div><b>${nm}</b>: ${T2('ponad chmurami ', 'above clouds ') + txt.join('; ')}</div>`; else noWin++;
+  });
+  if (noWin) lines += `<div style="color:#8b99a6">${T2(`Szczyty bez okien w prognozie: ${noWin}.`, `Peaks with no windows in the forecast: ${noWin}.`)}</div>`;
+  box.innerHTML = `<div style="overflow-x:auto"><table class="wt">${head}</tr>${body}</table></div><div class="ws">${lines}<div style="color:#8b99a6">${T2('Biała ramka = wybrana godzina; kreskowane = niepewne; przyciemnione = godziny już minione.', 'White frame = selected hour; hatched = uncertain; dimmed = hours already past.')}</div></div>`;
+}
+
+// ---------- start ----------
+async function loadAll() {
+  setLoading(true);
+  try {
+    const model = $('model').value;
+    if (!inside) inside = buildInside();
+    if (!elev) elev = await loadElevations();
+    if (!wCoords.length) { wCoords = buildWeatherPoints(inside, elev); hCoords = buildCoarsePoints(inside); }
+    setStatus(`Punkty pogodowe: ${wCoords.length} (+${hCoords.length} do wysokości poziomów). Pobieram…`, `Weather points: ${wCoords.length} (+${hCoords.length} for level heights). Downloading…`);
+    const hPts = await fetchPoints(model, hCoords, CFG.levels.map(p => `geopotential_height_${p}hPa`), 'h|', 50, 0, ['Wysokości poziomów', 'Pressure-level heights']);
+    // 10 zmiennych na punkt: zachmurzenie niskie i średnie, wilgotność 2 m (mgła) i 7 poziomów ciśnienia
+    wPts = await fetchPoints(model, wCoords, ['cloud_cover_low', 'cloud_cover_mid', 'relative_humidity_2m', ...CFG.levels.map(p => `cloud_cover_${p}hPa`)], 'm2|', CFG.batch, 0, ['Prognoza', 'Forecast']);
+    attachHeights(wPts, wCoords, hPts, hCoords);
+    fogRH = wPts.map(o => o.hourly.relative_humidity_2m);
+    const n = wPts[0].hourly.time.length;
+    $('hour').max = n - 1;
+    const now = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Warsaw' }).slice(0, 13).replace(' ', 'T');
+    const k = wPts[0].hourly.time.findIndex(s => s.startsWith(now));
+    $('hour').value = k >= 0 ? k : 0;
+    nowIdx = k >= 0 ? k : 0;
+    setStatus('Liczę interpolację…', 'Computing interpolation…');
+    await sleep(20);
+    nb = buildNeighbors(inside, wCoords);
+    if (!peaks.length) { peaks = buildPeaks(); initPeaks(); }
+    render();
+    setStatus(`Gotowe. Punkty pogodowe: ${wCoords.length}, szczyty: ${peaks.length}. ${peakNote.pl} Kliknij mapę, aby zobaczyć warstwy chmur.`,
+              `Done. Weather points: ${wCoords.length}, peaks: ${peaks.length}. ${peakNote.en} Click the map to see cloud layers.`);
+  } catch (err) { setStatus('Błąd: ' + err.message, 'Error: ' + (err.en || err.message), true); }
+  finally { setLoading(false); }
+}
+
+// ---------- napis LOADING: niebieski, z poszarpanymi krawędziami ----------
+function buildLoadingArt() {
+  const box = $('loadart'); if (!box) return;
+  const NS = 'http://www.w3.org/2000/svg', word = T2('ŁADOWANIE', 'LOADING'), FS = 40, BASE = 46;
+  box.innerHTML = '';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('height', 58); svg.setAttribute('width', 300); svg.setAttribute('viewBox', '0 0 300 58');
+  svg.innerHTML = '<defs><linearGradient id="lgBlue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd0ff"/><stop offset="1" stop-color="#2b6de0"/></linearGradient>' +
+    '<filter id="rough" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/></filter></defs>';
+  const text = document.createElementNS(NS, 'text');
+  text.setAttribute('x', 4); text.setAttribute('y', BASE); text.setAttribute('font-size', FS); text.setAttribute('font-weight', 900);
+  text.setAttribute('font-family', "'Arial Black','Segoe UI Black',Impact,'Helvetica Neue',Arial,sans-serif");
+  text.setAttribute('letter-spacing', 2); text.setAttribute('fill', 'url(#lgBlue)'); text.setAttribute('filter', 'url(#rough)');
+  text.textContent = word;
+  svg.appendChild(text); box.appendChild(svg);
+  let total = 0; try { total = text.getComputedTextLength() + 8; } catch (e) {}
+  if (!(total > 20)) total = word.length * 34;
+  const W = Math.ceil(total + 6);
+  svg.setAttribute('width', W); svg.setAttribute('viewBox', `0 0 ${W} 58`);
+}
+
+// ---------- język ----------
+function applyLang() {
+  document.documentElement.lang = LANG;
+  document.title = T2('Powyżej chmur – Dolny Śląsk (południe)', 'Above the clouds – Lower Silesia (south)');
+  document.querySelectorAll('[data-pl]').forEach(el => { el.innerHTML = LANG === 'pl' ? el.dataset.pl : el.dataset.en; });
+  $('status').textContent = T2(lastStatus.pl, lastStatus.en);
+  document.querySelectorAll('.lg').forEach(b => b.classList.toggle('act', b.dataset.l === LANG));
+  legend.getContainer().innerHTML = legendHTML();
+  winHead(); map.closePopup();
+  if (peaks.length && lastLayers.length) { updatePeaks(); renderTable(); }
+  else { $('peaklist').textContent = T2('Szczyty: czekam na dane…', 'Peaks: waiting for data…'); $('wintable').textContent = T2('czekam na dane…', 'waiting for data…'); }
+  buildLoadingArt();
+}
+['hour', 'thr', 'fog'].forEach(id => $(id).addEventListener('input', render));
+$('pmin').addEventListener('change', () => { updatePeaks(); renderTable(); });
+$('opa').addEventListener('input', () => { if (overlay) overlay.setOpacity(+$('opa').value / 100); });
+$('model').addEventListener('change', loadAll);
+const openHelp = () => $('help').classList.add('on'), closeHelp = () => $('help').classList.remove('on');
+$('helpbtn').addEventListener('click', openHelp);
+$('helpx').addEventListener('click', closeHelp);
+$('help').addEventListener('click', e => { if (e.target.id === 'help') closeHelp(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHelp(); });
+openHelp();   // przy starcie okienko jest na wierzchu
+setStatus('Start…', 'Starting…');
+applyLang();
+loadAll();
+</script>
+</body>
+</html>
