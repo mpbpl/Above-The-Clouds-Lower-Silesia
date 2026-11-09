@@ -6,6 +6,7 @@
 <title>Above the clouds – Lower Silesia (south)</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js"></script>
 <style>
   :root { --bg:#14191f; --panel:#1c232b; --line:#2c3640; --txt:#dfe6ec; --dim:#8b99a6; }
   * { box-sizing:border-box; }
@@ -76,6 +77,14 @@
   .wt td.n { cursor:pointer; }
   .wt tr.hl td.n, .wt tr.hl td.e { background:#2f4a66; color:#fff; font-weight:600; }
   .pk.sel { filter:drop-shadow(0 0 7px #fff) drop-shadow(0 0 4px rgba(255,35,70,.95)); }
+  .cam { font-size:17px; line-height:20px; width:20px; height:20px; text-align:center; cursor:pointer; filter:drop-shadow(0 0 3px #000); }
+  .cam:hover { transform:scale(1.2); }
+  .camp { width:min(320px,72vw); }
+  .camp .cm { margin:6px 0 4px; min-height:60px; background:#111; border-radius:4px; overflow:hidden; }
+  .camp .cv { display:block; width:100%; height:auto; }
+  .camp .cs { font-size:12px; color:#555; margin:2px 0 4px; }
+  .camp .cs.err { color:#c0392b; }
+  .camp .cl { font-size:12px; }
 </style>
 </head>
 <body>
@@ -96,7 +105,7 @@
   <div id="loading"><div id="loadart"></div>
     <svg class="arrow" width="40" height="52" viewBox="0 0 40 52" fill="none" stroke="#5db0ff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 48 C 8 36, 32 24, 20 8"/><path d="M9 18 L20 5 L31 18"/></svg>
   </div></div>
-<footer id="foot" data-pl='Dane pogodowe: <a href="https://open-meteo.com">Open-Meteo.com</a> (DWD ICON), CC BY 4.0 · wysokości terenu: AWS Terrain Tiles (Terrarium: SRTM i inne) · mapa: OpenTopoMap/OSM. Granice to łamane między wskazanymi miejscowościami. Wierzchołek chmur jest szacowany z wilgotności na poziomach ciśnienia.' data-en='Weather data: <a href="https://open-meteo.com">Open-Meteo.com</a> (DWD ICON), CC BY 4.0 · terrain heights: AWS Terrain Tiles (Terrarium: SRTM and others) · map: OpenTopoMap/OSM. The area boundary is a polyline between the listed towns. Cloud tops are estimated from humidity on pressure levels.'></footer>
+<footer id="foot" data-pl='Dane pogodowe: <a href="https://open-meteo.com">Open-Meteo.com</a> (DWD ICON), CC BY 4.0 · wysokości terenu: AWS Terrain Tiles (Terrarium: SRTM i inne) · mapa: OpenTopoMap/OSM · kamerki: źródło podane w oknie kamery. Granice to łamane między wskazanymi miejscowościami. Wierzchołek chmur jest szacowany z wilgotności na poziomach ciśnienia.' data-en='Weather data: <a href="https://open-meteo.com">Open-Meteo.com</a> (DWD ICON), CC BY 4.0 · terrain heights: AWS Terrain Tiles (Terrarium: SRTM and others) · map: OpenTopoMap/OSM · webcams: source given in the webcam popup. The area boundary is a polyline between the listed towns. Cloud tops are estimated from humidity on pressure levels.'></footer>
 
 
 <div id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle">
@@ -111,9 +120,10 @@
           <li><b>Hour</b> – pick the forecast hour. <b>Cloud threshold</b> – cloud amount (%) that counts as a layer. <b>Fog threshold</b> – humidity (RH) treated as fog. <b>Peaks ≥</b> – minimum height of shown peaks. <b>Opacity</b> – overlay strength. <b>EN | PL</b> – map language.</li>
           <li><b>Click the map</b> for terrain height and cloud layers at that spot. <b>Hover or tap a ▲</b> for the peak's status.</li>
           <li><b>Top-left list:</b> peaks above the clouds now. <b>Bottom-left table:</b> the next 48 h for the highest and favourite peaks – click a cell to jump to that hour.</li>
-          <li><b>Colours:</b> <span class="sw" style="background:#7d8087"></span>in cloud · <span class="sw" style="background:#96c8f0"></span><span class="sw" style="background:#46a55a"></span><span class="sw" style="background:#ebc332"></span><span class="sw" style="background:#cd463c"></span><span class="sw" style="background:#0a0a0a"></span>above clouds with cloud cover 6–8 / 4–6 / 2–4 / 1–2 / 0 oktas · <span class="sw" style="background:#b078dc"></span>fog (estimated) · no colour = below cloud base or no clouds.</li>
+          <li><b>Colours:</b> <span class="sw" style="background:#7d8087"></span>in cloud · <span class="sw" style="background:#96c8f0"></span><span class="sw" style="background:#46a55a"></span><span class="sw" style="background:#ebc332"></span><span class="sw" style="background:#cd463c"></span><span class="sw" style="background:#0a0a0a"></span>above clouds with cloud cover 7–8 / 5–6 / 3–4 / 1–2 / 0 oktas · <span class="sw" style="background:#b078dc"></span>fog (estimated) · no colour = below cloud base or no clouds.</li>
           <li><b>Peaks ▲:</b> <span class="sw" style="background:#3fb950"></span>above clouds · <span class="sw" style="background:#9aa4ae"></span>in cloud · <span class="sw" style="background:#58a6ff"></span>below clouds · <span class="sw" style="background:#e3b341"></span>no clouds. Dashed outline = uncertain (small margin).</li>
           <li><b>Click a ▲</b> to pin its info (it stays open and the peak's row in the table is highlighted); click a name in the table to find it on the map. <b>Click a legend item</b> to hide/show that class of terrain or peaks; ↺ restores all.</li>
+          <li><b>Webcams 📷</b> sit to the right of the peak they are assigned to. Click one for a snapshot taken at that moment, with a link to the webcam below. Toggle the layer in the legend (Webcams).</li>
           <li>The first load can take a couple of minutes (LOADING banner); data is then cached for 3 hours.</li>
         </ul>
       </div>
@@ -124,9 +134,10 @@
           <li><b>Godzina</b> – wybór godziny prognozy. <b>Próg chmury</b> – zachmurzenie (%) uznawane za warstwę. <b>Próg mgły</b> – wilgotność (RH) uznawana za mgłę. <b>Szczyty ≥</b> – minimalna wysokość pokazywanych szczytów. <b>Krycie</b> – siła nakładki. <b>EN | PL</b> – język mapy.</li>
           <li><b>Kliknij mapę</b>, aby zobaczyć wysokość terenu i warstwy chmur w tym miejscu. <b>Najedź lub dotknij ▲</b>, aby zobaczyć stan szczytu.</li>
           <li><b>Lista w lewym górnym rogu:</b> szczyty ponad chmurami teraz. <b>Tabela w lewym dolnym rogu:</b> najbliższe 48 h dla najwyższych i wybranych szczytów – kliknij komórkę, aby przejść do tej godziny.</li>
-          <li><b>Kolory:</b> <span class="sw" style="background:#7d8087"></span>w chmurze · <span class="sw" style="background:#96c8f0"></span><span class="sw" style="background:#46a55a"></span><span class="sw" style="background:#ebc332"></span><span class="sw" style="background:#cd463c"></span><span class="sw" style="background:#0a0a0a"></span>ponad chmurami przy zachmurzeniu 6–8 / 4–6 / 2–4 / 1–2 / 0 okt. · <span class="sw" style="background:#b078dc"></span>mgła (szacunek) · brak koloru = pod podstawą chmur lub bez chmur.</li>
+          <li><b>Kolory:</b> <span class="sw" style="background:#7d8087"></span>w chmurze · <span class="sw" style="background:#96c8f0"></span><span class="sw" style="background:#46a55a"></span><span class="sw" style="background:#ebc332"></span><span class="sw" style="background:#cd463c"></span><span class="sw" style="background:#0a0a0a"></span>ponad chmurami przy zachmurzeniu 7–8 / 5–6 / 3–4 / 1–2 / 0 okt. · <span class="sw" style="background:#b078dc"></span>mgła (szacunek) · brak koloru = pod podstawą chmur lub bez chmur.</li>
           <li><b>Szczyty ▲:</b> <span class="sw" style="background:#3fb950"></span>ponad chmurami · <span class="sw" style="background:#9aa4ae"></span>w chmurze · <span class="sw" style="background:#58a6ff"></span>pod chmurami · <span class="sw" style="background:#e3b341"></span>bez chmur. Przerywany kontur = niepewne (mały zapas).</li>
           <li><b>Kliknij ▲</b>, aby przypiąć info o szczycie (zostaje otwarte, a jego wiersz w tabeli jest podświetlony); kliknij nazwę w tabeli, aby znaleźć szczyt na mapie. <b>Kliknij pozycję legendy</b>, aby ukryć/pokazać daną klasę terenu lub szczytów; ↺ przywraca wszystko.</li>
+          <li><b>Kamerki 📷</b> są po prawej od szczytu, do którego je przypisano. Kliknij, aby zobaczyć zrzut z chwili kliknięcia, a pod nim link do kamery. Warstwę włączysz/wyłączysz w legendzie (Kamerki).</li>
           <li>Pierwsze ładowanie może potrwać kilka minut (napis LOADING); potem dane są pamiętane przez 3 godziny.</li>
         </ul>
       </div>
@@ -173,7 +184,7 @@ function buildInside() {
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) a[r * COLS + c] = inPoly(cellLat(r), cellLon(c)) ? 1 : 0;
   return a;
 }
-// Punkty pogodowe: bloki ~5 km; blok z terenem > denseAbove m dostaje 4 punkty (co ~2,5 km), pozostałe 1 punkt
+// Punkty pogodowe: bloki ~7 km (wLat×wLon); blok z terenem > denseAbove m dostaje 4 punkty (co ~3,5 km), pozostałe 1 punkt
 function buildWeatherPoints(inside, elev) {
   const blocks = new Map();
   for (let k = 0; k < ROWS * COLS; k++) {
@@ -395,6 +406,10 @@ const MANUAL_PEAKS = [
   ["Kłodzka Góra", 757, 50.451670, 16.753221],
   ["Kalwaria", 575, 50.495556, 16.748889]
 ];
+// Kamerki: [nazwa kamery, nazwa szczytu z MANUAL_PEAKS (tam pojawi się ikonka), URL strumienia HLS (.m3u8), URL strony kamery, (opcjonalnie) wysokość szczytu przy powtórzonych nazwach]
+const MANUAL_WEBCAMS = [
+  ["Widok na wieżę", "Wielka Sowa", "https://kamery.emnetgluszyca.pl:5443/LiveApp/streams/ZJOxqQjE5rMaCYOO1737705272155.m3u8", "https://www.pieszyce.pl/widok-na-wieze.html"]
+];
 // Stan szczytu względem chmur: above (ponad), in (w chmurze), under (pod podstawą), clear (bez chmur)
 function peakState(layers, h) {
   for (const L of layers) if (h >= L.base && h <= L.top) return { st: 'in', margin: Math.min(h - L.base, L.top - h), base: L.base, top: L.top };
@@ -467,6 +482,7 @@ POLY_N.forEach((p, i) => L.circleMarker(p, { radius: 3, color: '#ffd24a', weight
 const names = ['Nysa', 'Krnov', 'Bruntál', 'Mohelnice', 'Hradec Králové', 'Turnov', 'Liberec', 'Bogatynia', 'Görlitz'];
 POLY_S.forEach((p, i) => L.circleMarker(p, { radius: 3, color: '#7fd4ff', weight: 1, fillOpacity: .9 }).addTo(map).bindTooltip(names[i]));
 map.createPane('peaks'); map.getPane('peaks').style.zIndex = 450;
+map.createPane('cams'); map.getPane('cams').style.zIndex = 460;
 const peakCtl = L.control({ position: 'topleft' });
 peakCtl.onAdd = () => { const d = L.DomUtil.create('div', 'peaks'); d.id = 'peaklist'; d.textContent = T2('Szczyty: czekam na dane…', 'Peaks: waiting for data…'); L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); return d; };
 peakCtl.addTo(map);
@@ -491,18 +507,20 @@ winCtl.onAdd = () => {
 };
 winCtl.addTo(map);
 
-const HID = { t: new Set(), p: new Set() };   // ukryte klasy: t = teren, p = szczyty (filtr z legendy)
+const HID = { t: new Set(), p: new Set(), k: new Set() };   // ukryte klasy: t = teren, p = szczyty, k = kamerki (filtr z legendy)
 const A_GRP = ['a0', 'a12', 'a12', 'a34', 'a34', 'a56', 'a56', 'a78', 'a78'];   // okty -> grupa koloru
 function legendHTML() {
   const row = (c, t, g, k) => `<div class="lf${HID[g].has(k) ? ' off' : ''}" data-g="${g}" data-k="${k}"><i style="background:${c}"></i>${t}</div>`;
   const ab = r => T2(`nad chmurami, ${r} okt.`, `above clouds, ${r} oktas`);
   return `<b>${T2('Teren względem chmur', 'Terrain vs. clouds')}</b>` + row(C_IN, T2('w chmurze', 'in cloud'), 't', 'c') +
     row(C_FOG, T2('mgła (szacunek z wilgotności)', 'fog (estimated from humidity)'), 't', 'f') +
-    row(C_ABOVE[8], ab('6–8'), 't', 'a78') + row(C_ABOVE[6], ab('4–6'), 't', 'a56') + row(C_ABOVE[4], ab('2–4'), 't', 'a34') + row(C_ABOVE[2], ab('1–2'), 't', 'a12') + row(C_ABOVE[0], ab('0'), 't', 'a0') +
+    row(C_ABOVE[8], ab('7–8'), 't', 'a78') + row(C_ABOVE[6], ab('5–6'), 't', 'a56') + row(C_ABOVE[4], ab('3–4'), 't', 'a34') + row(C_ABOVE[2], ab('1–2'), 't', 'a12') + row(C_ABOVE[0], ab('0'), 't', 'a0') +
     `<div style="color:#8b99a6">${T2('brak koloru: pod podstawą chmur lub bez chmur', 'no colour: below cloud base or no clouds')}</div>` +
     `<div style="margin-top:4px"><b>${T2('Szczyty', 'Peaks')}</b></div>` +
     row(PCOL.above, T2('ponad chmurami', 'above clouds'), 'p', 'above') + row(PCOL.in, T2('w chmurze', 'in cloud'), 'p', 'in') + row(PCOL.under, T2('pod chmurami', 'below clouds'), 'p', 'under') + row(PCOL.clear, T2('bez chmur', 'no clouds'), 'p', 'clear') +
     `<div style="color:#8b99a6">${T2('▲ pulsujący trójkąt; przerywany kontur = niepewne', '▲ pulsing triangle; dashed outline = uncertain')}</div>` +
+    `<div style="margin-top:4px"><b>${T2('Kamerki', 'Webcams')}</b></div>` +
+    `<div class="lf${HID.k.has('cam') ? ' off' : ''}" data-g="k" data-k="cam"><span style="display:inline-block;width:14px;margin-right:7px;text-align:center">📷</span>${T2('kamerki (zrzut w oknie)', 'webcams (snapshot in popup)')}</div>` +
     `<div class="lreset">${T2('↺ pokaż wszystko (klik w pozycję = ukryj/pokaż)', '↺ show all (click an item = hide/show)')}</div>`;
 }
 const legend = L.control({ position: 'bottomright' });
@@ -510,7 +528,7 @@ legend.onAdd = () => { const d = L.DomUtil.create('div', 'legend'); d.innerHTML 
 legend.addTo(map);
 L.DomEvent.disableClickPropagation(legend.getContainer());
 legend.getContainer().addEventListener('click', e => {
-  if (e.target.closest('.lreset')) { HID.t.clear(); HID.p.clear(); }
+  if (e.target.closest('.lreset')) { HID.t.clear(); HID.p.clear(); HID.k.clear(); }
   else {
     const d = e.target.closest('.lf'); if (!d) return;
     const s = HID[d.dataset.g]; s.has(d.dataset.k) ? s.delete(d.dataset.k) : s.add(d.dataset.k);
@@ -661,6 +679,7 @@ function render() {
   $('when').textContent = wPts[0].hourly.time[t].replace('T', ' ');
   $('thrv').textContent = thr + '%';
   $('fogv').textContent = fthr + '%';
+  updateCams();
   updatePeaks();
   renderTable();
 }
@@ -758,6 +777,78 @@ function updatePeaks() {
   $('peaklist').innerHTML = `<b>${T2('Szczyty ponad chmurami', 'Peaks above the clouds')}: ${rows.length}</b>` + rows.join('');
 }
 
+// ---------- kamerki ----------
+// Ikonka leży po prawej od trójkąta szczytu (stałe przesunięcie w pikselach, niezależne od zoomu). Zrzut powstaje dopiero przy otwarciu okna.
+let camMarkers = [];
+const camIcon = L.divIcon({ html: '<div class="cam">📷</div>', className: '', iconSize: [20, 20], iconAnchor: [-14, 10], popupAnchor: [24, -12], tooltipAnchor: [24, -12] });
+function initCams() {
+  const miss = [];
+  camMarkers = [];
+  for (const c of MANUAL_WEBCAMS) {
+    const [name, peakName, , , peakEle] = c;
+    const p = peaks.find(q => q.name === peakName && (peakEle == null || q.ele === peakEle));
+    if (!p) { miss.push(`${name} → ${peakName}`); continue; }
+    const mk = L.marker([p.lat, p.lon], { pane: 'cams', icon: camIcon, keyboard: true })
+      .bindTooltip(esc(name), { direction: 'top' }).bindPopup('', { autoPan: true });
+    mk.on('popupopen', () => { mk.closeTooltip(); camStart(mk, c); });
+    mk.on('popupclose', () => camStop(mk));
+    camMarkers.push(mk);
+  }
+  if (miss.length) { peakNote.pl += ` Kamerki bez szczytu (pominięte): ${miss.join(', ')}.`; peakNote.en += ` Webcams without a matching peak (skipped): ${miss.join(', ')}.`; }
+}
+function updateCams() {
+  const hide = HID.k.has('cam');
+  camMarkers.forEach(mk => { const on = map.hasLayer(mk); if (hide && on) map.removeLayer(mk); else if (!hide && !on) mk.addTo(map); });
+}
+function camStop(mk) {
+  const st = mk._cam; if (!st) return;
+  st.done = true; st.timers.forEach(clearTimeout); st.timers = [];
+  if (st.hls) { try { st.hls.destroy(); } catch (e) {} st.hls = null; }
+  if (st.video) { try { st.video.pause(); st.video.removeAttribute('src'); st.video.load(); } catch (e) {} }
+}
+function camStart(mk, c) {
+  camStop(mk);
+  const [name, peakName, stream, page] = c, st = mk._cam = { timers: [], hls: null, video: null, done: false };
+  let host = page; try { host = new URL(page).hostname.replace(/^www\./, ''); } catch (e) {}
+  const el = document.createElement('div'); el.className = 'camp';
+  el.innerHTML = `<b>${esc(name)}</b> · ${esc(peakName)}<div class="cm"></div><div class="cs"></div>` +
+    `<div class="cl">${T2('Link do kamery', 'Webcam link')}: <a href="${esc(page)}" target="_blank" rel="noopener">${esc(host)}</a></div>`;
+  const box = el.querySelector('.cm'), msg = el.querySelector('.cs');
+  const say = (pl, en, err) => { msg.textContent = T2(pl, en); msg.className = 'cs' + (err ? ' err' : ''); };
+  say('Ładowanie obrazu…', 'Loading image…');
+  mk.getPopup().setContent(el);
+  const video = st.video = document.createElement('video');
+  video.className = 'cv'; video.muted = true; video.defaultMuted = true; video.autoplay = true; video.playsInline = true; video.setAttribute('playsinline', '');
+  box.appendChild(video);
+  const fail = () => { if (st.done) return; camStop(mk); box.replaceChildren(); say('Nie udało się wczytać obrazu z kamery – użyj linku poniżej.', 'Could not load the webcam image – use the link below.', true); };
+  const snap = () => {
+    if (st.done) return;
+    if (!video.videoWidth) { st.timers.push(setTimeout(snap, 700)); return; }
+    const tm = new Date().toLocaleString(LANG === 'pl' ? 'pl-PL' : 'en-GB', { timeZone: 'Europe/Warsaw', hour12: false });
+    try {
+      const cv = document.createElement('canvas'); cv.width = video.videoWidth; cv.height = video.videoHeight;
+      cv.getContext('2d').drawImage(video, 0, 0);
+      const img = new Image(); img.className = 'cv'; img.alt = name; img.src = cv.toDataURL('image/jpeg', 0.88);
+      box.replaceChildren(img);
+      say(`Zrzut z chwili kliknięcia: ${tm}`, `Snapshot taken at click: ${tm}`);
+      camStop(mk);
+    } catch (e) {   // serwer kamery nie zezwala na odczyt klatki (CORS): zostawiamy żywy podgląd
+      st.done = true; st.timers.forEach(clearTimeout);
+      say('Serwer kamery blokuje zrzut – podgląd na żywo.', 'The webcam server blocks snapshots – live preview.');
+    }
+  };
+  video.addEventListener('playing', () => st.timers.push(setTimeout(snap, 500)), { once: true });
+  if (window.Hls && Hls.isSupported()) {
+    const hls = st.hls = new Hls({ maxBufferLength: 6 });
+    hls.on(Hls.Events.ERROR, (ev, d) => { if (d.fatal) fail(); });
+    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+    hls.loadSource(stream); hls.attachMedia(video);
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.crossOrigin = 'anonymous'; video.src = stream; video.play().catch(() => {});
+  } else fail();
+  st.timers.push(setTimeout(() => { if (!st.done && !video.videoWidth) fail(); }, 20000));
+}
+
 // ---------- tabela „okna ponad chmurami" ----------
 const DAYS = { pl: ['nd', 'pn', 'wt', 'śr', 'cz', 'pt', 'sb'], en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] };
 const dayName = s => DAYS[LANG][new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)).getDay()];
@@ -832,7 +923,7 @@ async function loadAll() {
     setStatus('Liczę interpolację…', 'Computing interpolation…');
     await sleep(20);
     nb = buildNeighbors(inside, wCoords);
-    if (!peaks.length) { peaks = buildPeaks(); initPeaks(); }
+    if (!peaks.length) { peaks = buildPeaks(); initPeaks(); initCams(); }
     render();
     setStatus(`Gotowe. Punkty pogodowe: ${wCoords.length}, szczyty: ${peaks.length}. ${peakNote.pl} Kliknij mapę, aby zobaczyć warstwy chmur.`,
               `Done. Weather points: ${wCoords.length}, peaks: ${peaks.length}. ${peakNote.en} Click the map to see cloud layers.`);
